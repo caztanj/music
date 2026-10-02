@@ -1,0 +1,22 @@
+# Jai compiler build artifacts
+.build/
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.obj
+
+# Generated audio outputs
+output.wav
+test_output_*.wav
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS generated files
+Thumbs.db
+[Dd]esktop.ini
