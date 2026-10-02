@@ -34,15 +34,6 @@ wasapi_initialize :: (state: *Wasapi_State, configuration: Audio_Configuration, 
 
     state.audio_client = cast(*IAudioClient) audio_client_pointer;
 
-    default_device_period: s64 = 0;
-    minimum_device_period: s64 = 0;
-    state.audio_client.vtable.GetDevicePeriod(state.audio_client, *default_device_period, *minimum_device_period);
-
-    buffer_duration_in_hundred_nanoseconds := default_device_period * 4;
-    if buffer_duration_in_hundred_nanoseconds < 500000 {
-        buffer_duration_in_hundred_nanoseconds = 500000;
-    }
-
     mix_format_pointer: *Wave_Format_Ex = null;
     get_mix_format_result := state.audio_client.vtable.GetMixFormat(state.audio_client, *mix_format_pointer);
     if get_mix_format_result == 0 && mix_format_pointer != null {
@@ -62,7 +53,12 @@ wasapi_initialize :: (state: *Wasapi_State, configuration: Audio_Configuration, 
     format.channel_mask = 3;
     format.sub_format = uid(SUBTYPE_IEEE_FLOAT);
 
-    stream_flags: DWORD = 0x00040000;
+    period_frame_count := cast(u32) ((state.sample_rate * 10) / 1000);
+    period_count := 8;
+    period_duration_in_microseconds: s64 = (cast(s64) period_frame_count * 1000000) / cast(s64) state.sample_rate;
+    buffer_duration_in_hundred_nanoseconds: s64 = period_duration_in_microseconds * cast(s64) period_count * 10;
+
+    stream_flags: DWORD = 0x0004_0000;
     initialize_result := state.audio_client.vtable.Initialize(state.audio_client, 0, stream_flags, buffer_duration_in_hundred_nanoseconds, 0, cast(*Wave_Format_Ex) *format, null);
 
     if initialize_result != 0 && mix_format_pointer != null {
@@ -78,7 +74,7 @@ wasapi_initialize :: (state: *Wasapi_State, configuration: Audio_Configuration, 
         return false;
     }
 
-    state.audio_event_handle = CreateEventW(null, 0, 0, null);
+    state.audio_event_handle = CreateEventA(null, 0, 0, null);
     if state.audio_event_handle == null {
         wasapi_shutdown(state);
         return false;
@@ -96,6 +92,8 @@ wasapi_initialize :: (state: *Wasapi_State, configuration: Audio_Configuration, 
         return false;
     }
 
+    state.period_frame_count = state.buffer_frame_count / cast(u32) period_count;
+
     iid_audio_render_client := uid(IID_I_AUDIO_RENDER_CLIENT);
     render_client_pointer: *void = null;
     get_service_result := state.audio_client.vtable.GetService(state.audio_client, *iid_audio_render_client, *render_client_pointer);
@@ -106,25 +104,6 @@ wasapi_initialize :: (state: *Wasapi_State, configuration: Audio_Configuration, 
 
     state.audio_render_client = cast(*IAudioRenderClient) render_client_pointer;
 
-    initial_buffer_pointer: *u8 = null;
-    initial_get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, state.buffer_frame_count, *initial_buffer_pointer);
-    if initial_get_buffer_result == 0 && initial_buffer_pointer != null {
-        initial_samples: [] float;
-        initial_samples.data = cast(*float) initial_buffer_pointer;
-        initial_samples.count = state.buffer_frame_count * cast(u32) state.channel_count;
-
-        sample_index := 0;
-        while sample_index < initial_samples.count {
-            initial_samples[sample_index] = 0.0;
-            sample_index += 1;
-        }
-
-        state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, state.buffer_frame_count, 0);
-    }
-
-    thread_init(*state.audio_thread, wasapi_audio_thread_procedure);
-    state.audio_thread.data = state;
-
     return true;
 }
 
@@ -133,10 +112,19 @@ wasapi_start :: (state: *Wasapi_State) -> bool {
         return true;
     }
 
+    initial_buffer_pointer: *u8 = null;
+    initial_get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, state.buffer_frame_count, *initial_buffer_pointer);
+    if initial_get_buffer_result == 0 && initial_buffer_pointer != null {
+        state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, state.buffer_frame_count, 2);
+    }
+
     start_client_result := state.audio_client.vtable.Start(state.audio_client);
     if start_client_result != 0 {
         return false;
     }
+
+    thread_init(*state.audio_thread, wasapi_audio_thread_procedure);
+    state.audio_thread.data = state;
 
     state.is_thread_running = true;
     thread_start(*state.audio_thread);
@@ -150,7 +138,10 @@ wasapi_stop :: (state: *Wasapi_State) -> bool {
     }
 
     state.is_thread_running = false;
-    SetEvent(state.audio_event_handle);
+
+    if state.audio_event_handle != null {
+        SetEvent(state.audio_event_handle);
+    }
 
     thread_is_done(*state.audio_thread, 2000);
     thread_deinit(*state.audio_thread);
@@ -211,43 +202,29 @@ wasapi_audio_thread_procedure :: (thread: *Thread) -> s64 {
 
     task_index: DWORD = 0;
     multimedia_task_handle := AvSetMmThreadCharacteristicsW(task_name.data, *task_index);
+    if multimedia_task_handle != null {
+        AvSetMmThreadPriority(multimedia_task_handle, 2);
+    }
 
-    SetThreadPriority(GetCurrentThread(), 15);
+    SetThreadPriority(GetCurrentThread(), 2);
 
     while state.is_thread_running {
-        wait_result := WaitForSingleObject(state.audio_event_handle, 2000);
-        if !state.is_thread_running {
+        wait_result := WaitForSingleObject(state.audio_event_handle, 5000);
+        if !state.is_thread_running || wait_result != 0 {
             break;
         }
 
-        if wait_result != 0 {
-            continue;
-        }
-
-        padding_frame_count: u32 = 0;
-        padding_result := state.audio_client.vtable.GetCurrentPadding(state.audio_client, *padding_frame_count);
-        if padding_result != 0 {
-            continue;
-        }
-
-        available_frame_count := state.buffer_frame_count - padding_frame_count;
-        if available_frame_count <= 0 {
-            continue;
-        }
-
         buffer_pointer: *u8 = null;
-        get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, available_frame_count, *buffer_pointer);
-        if get_buffer_result != 0 || buffer_pointer == null {
-            continue;
+        get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, state.period_frame_count, *buffer_pointer);
+        if get_buffer_result == 0 && buffer_pointer != null {
+            output_samples: [] float;
+            output_samples.data = cast(*float) buffer_pointer;
+            output_samples.count = state.period_frame_count * cast(u32) state.channel_count;
+
+            state.callback(output_samples, state.channel_count, state.sample_rate, state.user_data);
+
+            state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, state.period_frame_count, 0);
         }
-
-        output_samples: [] float;
-        output_samples.data = cast(*float) buffer_pointer;
-        output_samples.count = available_frame_count * cast(u32) state.channel_count;
-
-        state.callback(output_samples, state.channel_count, state.sample_rate, state.user_data);
-
-        state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, available_frame_count, 0);
     }
 
     if multimedia_task_handle != null {
@@ -265,6 +242,7 @@ CoCreateInstance :: (class_identifier: *GUID, outer: *IUnknown, class_context: D
 CoTaskMemFree :: (pointer: *void) -> void #foreign Ole32;
 
 AvSetMmThreadCharacteristicsW :: (task_name: *u16, task_index: *DWORD) -> HANDLE #foreign avrt;
+AvSetMmThreadPriority :: (handle: HANDLE, priority: s32) -> BOOL #foreign avrt;
 AvRevertMmThreadCharacteristics :: (handle: HANDLE) -> BOOL #foreign avrt;
 
 Wasapi_State :: struct {
@@ -276,6 +254,7 @@ Wasapi_State :: struct {
     audio_thread: Thread;
     is_thread_running: bool;
     buffer_frame_count: u32;
+    period_frame_count: u32;
     channel_count: int;
     sample_rate: int;
     callback: Audio_Callback;
