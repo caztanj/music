@@ -4,7 +4,7 @@
 |---|---|
 | **Project Name** | Text DAW / Music Engine |
 | **Language** | Jai |
-| **Primary Platform** | Windows x64 (WASAPI / miniaudio / DirectSound) |
+| **Platform Architecture** | Cross-platform (Windows x64 via native WASAPI, with future Linux & macOS support; all built from scratch without third-party audio libraries) |
 | **Format** | Plaintext `.song` specification (FL Studio mental model) |
 | **Primary Output** | Real-time audio stream (low latency) + Offline 32-bit float WAV exporter |
 
@@ -20,6 +20,7 @@ This project is a lightweight, high-performance, text-specified music sequencer 
 - **Deterministic & Sample-Accurate**: Playback timing is calculated strictly in discrete audio sample counts (`u64`), avoiding float accumulation drift.
 - **Zero Real-Time Allocation**: The audio rendering thread guarantees bounded execution time with zero heap allocations, zero system I/O, and zero mutex locks.
 - **Seamless Hot Reloading**: Save the file in any text editor, and the engine reloads the state instantaneously without stopping audio or introducing audible clicks.
+- **Cross-Platform & Dependency-Free**: Architected for multi-platform support (Windows, Linux, macOS). Platform backends are implemented from scratch using native OS APIs directly without third-party audio libraries. The core engine, DSP, sequencer, and parser remain strictly platform-independent.
 
 ---
 
@@ -181,10 +182,11 @@ c:/Kod/Music/
 │   │   └── tests/                 # Parser unit tests
 │   │
 │   ├── audio/
-│   │   ├── audio_backend.jai      # Platform audio output (WASAPI / miniaudio)
+│   │   ├── audio_backend.jai      # Unified OS-agnostic audio backend interface
+│   │   ├── wasapi.jai             # Native Windows WASAPI implementation from scratch
 │   │   ├── wav_export.jai         # Offline 32-bit float / 16-bit PCM exporter
 │   │   ├── buffer.jai             # Interleaved audio buffer utilities
-│   │   └── tests/                 # Audio & WAV tests
+│   │   └── tests/                 # Audio & WAV tests (e.g. wav_export_tests.jai)
 │   │
 │   ├── engine/
 │   │   ├── sequencer.jai          # Sample-accurate clock & pattern runner
@@ -272,3 +274,8 @@ While `play` mode is running in the terminal:
    - Never write comments in code. Keep code completely clean and free of comments.
 6. **No Abbreviations**:
    - Never use abbreviations for identifiers, variables, functions, or parameters (e.g. use `Command_Line` instead of `Cli`, `arguments` instead of `args`, `command` instead of `cmd`, `decibels` instead of `db`, `test_function` instead of `fn`, `location` instead of `loc`, `difference` instead of `diff`, `hertz` instead of `hz`). Write all names in full.
+7. **Cross-Platform Architecture & No External Audio Libraries**:
+   - The engine is designed for multi-platform portability (Windows, Linux, macOS).
+   - Audio backends must be implemented from scratch using native OS APIs directly (e.g. WASAPI on Windows via COM vtables, ALSA/PipeWire on Linux, CoreAudio on macOS). Never introduce third-party audio libraries (such as miniaudio, SDL, or PortAudio).
+   - `audio_backend.jai` provides the common platform-agnostic interface (`Audio_Backend`, `Audio_Configuration`, `Audio_Callback`), delegating to platform-specific implementations.
+   - Core music logic, DSP algorithms, mixer channels, and sequencer timekeeping must remain 100% platform-independent.

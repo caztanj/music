@@ -1,6 +1,7 @@
 main :: () {
     common_tests();
     wav_export_tests();
+    audio_backend_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -49,9 +50,14 @@ current_test_failed := false;
 
 #load "common.jai";
 #load "audio/wav_export.jai";
+#load "audio/audio_backend.jai";
+#load "audio/wasapi.jai";
 #load "tests/common_tests.jai";
 #load "audio/tests/wav_export_tests.jai";
+#load "audio/tests/audio_backend_tests.jai";
 
 #import "Basic";
 #import "Math";
 #import "File";
+#import "Windows";
+#import "Thread";

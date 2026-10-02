@@ -114,7 +114,11 @@ Command_Line_Options :: struct {
 
 #load "common.jai";
 #load "audio/wav_export.jai";
+#load "audio/audio_backend.jai";
+#load "audio/wasapi.jai";
 
 #import "Basic";
 #import "Math";
 #import "File";
+#import "Windows";
+#import "Thread";

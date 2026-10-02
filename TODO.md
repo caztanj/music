@@ -47,10 +47,10 @@
   - [x] Support 32-bit IEEE float stereo output (default).
   - [x] Support 16-bit PCM integer stereo output with dithering / clipping protection.
   - [x] Verify export output opens and plays cleanly in Windows Media Player and VLC.
-- [ ] **2.2 Real-Time Audio Output Backend (`src/audio/audio_backend.jai`)**
-  - [ ] Implement low-latency audio stream using WASAPI or lightweight audio backend.
-  - [ ] Setup high-priority audio callback supplying interleaved `float32` frames.
-  - [ ] Provide buffer size selection (default: 512 samples / ~11.6 ms at 44.1 kHz).
+- [x] **2.2 Real-Time Audio Output Backend (`src/audio/audio_backend.jai`)**
+  - [x] Implement low-latency audio stream using native WASAPI from scratch (no external audio libraries).
+  - [x] Setup high-priority audio callback supplying interleaved `float32` frames.
+  - [x] Provide buffer size selection (default: 512 samples / ~11.6 ms at 44.1 kHz).
 - [ ] **2.3 Audio Sanity Harness**
   - [ ] Write a 440 Hz stereo sine wave generator test to verify glitch-free real-time audio.
 
