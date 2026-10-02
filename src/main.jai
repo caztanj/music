@@ -20,6 +20,14 @@ main :: () {
         case .EXPORT;
             print("Exporting % to %\n", options.song_path, options.output_path);
 
+        case .TEST_TONE;
+            print("Playing 440 Hz test tone for % seconds...\n", options.test_tone_duration);
+            play_success := play_test_tone(options.test_tone_duration, 440.0, 0.2);
+            if !play_success {
+                print("Failed to initialize or play audio test tone.\n");
+                exit(1);
+            }
+
         case;
             print_usage();
     }
@@ -84,6 +92,18 @@ parse_arguments :: (arguments: [] string) -> (Command_Line_Options, bool) {
         return options, true;
     }
 
+    if command == "test-tone" {
+        options.command = .TEST_TONE;
+        if arguments.count >= 3 {
+            duration_value, parse_success := string_to_float(arguments[2]);
+            if parse_success && duration_value > 0.0 {
+                options.test_tone_duration = duration_value;
+            }
+        }
+
+        return options, true;
+    }
+
     print("Error: Unknown command '%'\n\n", command);
 
     return options, false;
@@ -95,6 +115,7 @@ print_usage :: () {
     print("  play <file.song>                 Play a song file with hot reloading\n");
     print("  export <file.song> -o <out.wav>  Export a song file to WAV\n");
     print("  check <file.song>                Validate a song file syntax\n");
+    print("  test-tone [seconds]              Play a 440 Hz sine test tone through speakers\n");
     print("  help                             Show this help message\n");
 }
 
@@ -104,12 +125,14 @@ Command_Type :: enum {
     PLAY;
     CHECK;
     EXPORT;
+    TEST_TONE;
 }
 
 Command_Line_Options :: struct {
     command: Command_Type = .NONE;
     song_path: string;
     output_path: string = "output.wav";
+    test_tone_duration: float = 1.0;
 }
 
 #load "common.jai";

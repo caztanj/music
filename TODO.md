@@ -3,7 +3,7 @@
 | Phase | Milestone | Primary Deliverable | Status |
 |---|---|---|:---:|
 | **Phase 1** | Project Scaffolding | Base layout, compilation setup, CLI skeleton | 🟢 Complete |
-| **Phase 2** | Audio Output & WAV Pipeline | WAV file writer & real-time audio playback | 🟡 In Progress |
+| **Phase 2** | Audio Output & WAV Pipeline | WAV file writer & real-time audio playback | 🟢 Complete |
 | **Phase 3** | Text Specification & Parser | Lexer, AST, parser & diagnostic error messages | ⚪ Not Started |
 | **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | ⚪ Not Started |
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | ⚪ Not Started |
@@ -51,8 +51,8 @@
   - [x] Implement low-latency audio stream using native WASAPI from scratch (no external audio libraries).
   - [x] Setup high-priority audio callback supplying interleaved `float32` frames.
   - [x] Provide buffer size selection (default: 512 samples / ~11.6 ms at 44.1 kHz).
-- [ ] **2.3 Audio Sanity Harness**
-  - [ ] Write a 440 Hz stereo sine wave generator test to verify glitch-free real-time audio.
+- [x] **2.3 Audio Sanity Harness**
+  - [x] Write a 440 Hz stereo sine wave generator test to verify glitch-free real-time audio.
 
 **Acceptance Criteria**: Running a test command plays a clean 440 Hz test tone through speakers without crackling, and an offline test writes a valid `.wav` file.
 

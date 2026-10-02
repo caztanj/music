@@ -57,6 +57,56 @@ audio_backend_shutdown :: (backend: *Audio_Backend) {
     }
 }
 
+play_test_tone :: (duration_in_seconds: float = 1.0, frequency: float64 = 440.0, amplitude: float = 0.2) -> bool {
+    state: Sine_Tone_State;
+    state.frequency = frequency;
+    state.amplitude = amplitude;
+
+    configuration: Audio_Configuration;
+    backend: Audio_Backend;
+
+    initialize_success := audio_backend_initialize(*backend, configuration, sine_tone_audio_callback, *state);
+    if !initialize_success {
+        return false;
+    }
+
+    start_success := audio_backend_start(*backend);
+    if !start_success {
+        audio_backend_shutdown(*backend);
+        return false;
+    }
+
+    sleep_milliseconds(cast(s32) (duration_in_seconds * 1000.0));
+
+    audio_backend_stop(*backend);
+    audio_backend_shutdown(*backend);
+
+    return true;
+}
+
+sine_tone_audio_callback :: (output_samples: [] float, channel_count: int, sample_rate: int, user_data: *void) {
+    state := cast(*Sine_Tone_State) user_data;
+    phase_increment := (state.frequency * 6.28318530717958648) / cast(float64) sample_rate;
+
+    sample_index := 0;
+    while sample_index < output_samples.count {
+        sample_value := cast(float) (sin(state.phase) * cast(float64) state.amplitude);
+
+        channel_index := 0;
+        while channel_index < channel_count {
+            output_samples[sample_index + channel_index] = sample_value;
+            channel_index += 1;
+        }
+
+        state.phase += phase_increment;
+        if state.phase >= 6.28318530717958648 {
+            state.phase -= 6.28318530717958648;
+        }
+
+        sample_index += channel_count;
+    }
+}
+
 Audio_Callback :: #type (output_samples: [] float, channel_count: int, sample_rate: int, user_data: *void);
 
 Audio_Configuration :: struct {
@@ -74,4 +124,10 @@ Audio_Backend :: struct {
     #if OS == .WINDOWS {
         wasapi_state: Wasapi_State;
     }
+}
+
+Sine_Tone_State :: struct {
+    phase: float64 = 0.0;
+    frequency: float64 = 440.0;
+    amplitude: float = 0.2;
 }

@@ -52,4 +52,27 @@ audio_backend_tests :: () {
             audio_backend_shutdown(*backend);
         }
     });
+
+    test("sine_tone_generation", () {
+        sine_state: Sine_Tone_State;
+        sine_state.frequency = 440.0;
+        sine_state.amplitude = 0.5;
+
+        test_samples: [8] float;
+        sine_tone_audio_callback(test_samples, 2, 44100, *sine_state);
+
+        expect_near(test_samples[0], 0.0);
+        expect_near(test_samples[1], 0.0);
+
+        expected_phase := (440.0 * 6.28318530717958648) / 44100.0;
+        expected_sample := cast(float) (sin(expected_phase) * 0.5);
+
+        expect_near(test_samples[2], expected_sample);
+        expect_near(test_samples[3], expected_sample);
+
+        play_success := play_test_tone(0.05, 440.0, 0.1);
+        if play_success {
+            expect_true(play_success);
+        }
+    });
 }
