@@ -3,6 +3,11 @@ initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synth
     voice.sample_rate = sample_rate;
     voice.is_active = false;
     voice.oscillator_phase = 0.0;
+    voice.oscillator_2_phase = 0.0;
+    voice.noise_seed = 1234567;
+    voice.pink_noise_state_0 = 0.0;
+    voice.pink_noise_state_1 = 0.0;
+    voice.pink_noise_state_2 = 0.0;
     voice.filter_state_1 = 0.0;
     voice.filter_state_2 = 0.0;
     configure_envelope(*voice.amplitude_envelope, configuration.envelope, sample_rate);
@@ -13,6 +18,7 @@ trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32
     voice.frequency_hertz = midi_to_hertz(midi_note_number);
     voice.velocity = velocity;
     voice.is_active = true;
+    voice.noise_seed ^= cast(u32) (midi_note_number * 104729 + 19);
 
     trigger_attack(*voice.amplitude_envelope);
 }
@@ -24,6 +30,10 @@ trigger_synthesizer_note_off :: (voice: *Synthesizer_Voice) {
 reset_synthesizer_voice :: (voice: *Synthesizer_Voice) {
     voice.is_active = false;
     voice.oscillator_phase = 0.0;
+    voice.oscillator_2_phase = 0.0;
+    voice.pink_noise_state_0 = 0.0;
+    voice.pink_noise_state_1 = 0.0;
+    voice.pink_noise_state_2 = 0.0;
     voice.filter_state_1 = 0.0;
     voice.filter_state_2 = 0.0;
     reset_envelope(*voice.amplitude_envelope);
@@ -33,6 +43,38 @@ is_synthesizer_voice_active :: (voice: *Synthesizer_Voice) -> bool {
     is_active := voice.is_active && is_envelope_active(*voice.amplitude_envelope);
 
     return is_active;
+}
+
+calculate_detuned_frequency :: (base_frequency_hertz: float, semitones: s32, cents: float) -> float {
+    if semitones == 0 && cents == 0.0 {
+        return base_frequency_hertz;
+    }
+
+    total_semitones := cast(float64) semitones + (cast(float64) cents / 100.0);
+    frequency_multiplier := pow(2.0, total_semitones / 12.0);
+    detuned_frequency := cast(float) (cast(float64) base_frequency_hertz * frequency_multiplier);
+
+    return detuned_frequency;
+}
+
+generate_white_noise_sample :: (noise_seed: *u32) -> float {
+    noise_seed.* = noise_seed.* * 1664525 + 1013904223;
+    normalized_value := cast(float) (noise_seed.* & 0x00FFFFFF) / 16777215.0;
+    sample_value := normalized_value * 2.0 - 1.0;
+
+    return sample_value;
+}
+
+generate_pink_noise_sample :: (noise_seed: *u32, state_0: *float, state_1: *float, state_2: *float) -> float {
+    white_sample := generate_white_noise_sample(noise_seed);
+
+    state_0.* = 0.99886 * state_0.* + white_sample * 0.0555179;
+    state_1.* = 0.99332 * state_1.* + white_sample * 0.0750759;
+    state_2.* = 0.96900 * state_2.* + white_sample * 0.1538520;
+
+    pink_sample := (state_0.* + state_1.* + state_2.* + white_sample * 0.5362) * 0.11;
+
+    return pink_sample;
 }
 
 render_synthesizer_sample :: (voice: *Synthesizer_Voice) -> float {
@@ -48,11 +90,57 @@ render_synthesizer_sample :: (voice: *Synthesizer_Voice) -> float {
     }
 
     phase_increment := cast(float64) voice.frequency_hertz / cast(float64) voice.sample_rate;
-    oscillator_sample := generate_oscillator_sample(voice.configuration.waveform, voice.oscillator_phase, phase_increment);
+    oscillator_sample := generate_oscillator_sample(
+        voice.configuration.waveform,
+        voice.oscillator_phase,
+        phase_increment,
+        *voice.noise_seed,
+        *voice.pink_noise_state_0,
+        *voice.pink_noise_state_1,
+        *voice.pink_noise_state_2
+    );
 
     voice.oscillator_phase += phase_increment;
     if voice.oscillator_phase >= 1.0 {
         voice.oscillator_phase -= 1.0;
+    }
+
+    if voice.configuration.oscillator_2_enabled {
+        frequency_2 := calculate_detuned_frequency(
+            voice.frequency_hertz,
+            voice.configuration.oscillator_2_semitones,
+            voice.configuration.oscillator_2_cents
+        );
+        phase_increment_2 := cast(float64) frequency_2 / cast(float64) voice.sample_rate;
+        oscillator_2_sample := generate_oscillator_sample(
+            voice.configuration.oscillator_2_waveform,
+            voice.oscillator_2_phase,
+            phase_increment_2,
+            *voice.noise_seed,
+            *voice.pink_noise_state_0,
+            *voice.pink_noise_state_1,
+            *voice.pink_noise_state_2
+        );
+
+        voice.oscillator_2_phase += phase_increment_2;
+        if voice.oscillator_2_phase >= 1.0 {
+            voice.oscillator_2_phase -= 1.0;
+        }
+
+        oscillator_sample = (1.0 - voice.configuration.oscillator_mix) * oscillator_sample + voice.configuration.oscillator_mix * oscillator_2_sample;
+    }
+
+    if voice.configuration.noise_level > 0.0 {
+        noise_sample := generate_oscillator_sample(
+            voice.configuration.noise_type,
+            0.0,
+            0.0,
+            *voice.noise_seed,
+            *voice.pink_noise_state_0,
+            *voice.pink_noise_state_1,
+            *voice.pink_noise_state_2
+        );
+        oscillator_sample += noise_sample * voice.configuration.noise_level;
     }
 
     filtered_sample := oscillator_sample;
@@ -80,7 +168,15 @@ render_synthesizer_block :: (voice: *Synthesizer_Voice, output_buffer: [] float)
     }
 }
 
-generate_oscillator_sample :: (waveform_type: Waveform_Type, phase: float64, phase_increment: float64) -> float {
+generate_oscillator_sample :: (
+    waveform_type: Waveform_Type,
+    phase: float64,
+    phase_increment: float64,
+    noise_seed: *u32 = null,
+    pink_state_0: *float = null,
+    pink_state_1: *float = null,
+    pink_state_2: *float = null
+) -> float {
     if waveform_type == {
         case .SINE;
             return cast(float) sin(phase * 2.0 * PI);
@@ -106,6 +202,24 @@ generate_oscillator_sample :: (waveform_type: Waveform_Type, phase: float64, pha
             naive_sample := ifx phase < 0.5 then cast(float)(4.0 * phase - 1.0) else cast(float)(3.0 - 4.0 * phase);
 
             return naive_sample;
+
+        case .WHITE_NOISE;
+            local_seed: u32 = 1234567;
+            effective_seed := ifx noise_seed != null then noise_seed else *local_seed;
+
+            return generate_white_noise_sample(effective_seed);
+
+        case .PINK_NOISE;
+            local_seed: u32 = 1234567;
+            local_state_0: float = 0.0;
+            local_state_1: float = 0.0;
+            local_state_2: float = 0.0;
+            effective_seed := ifx noise_seed != null then noise_seed else *local_seed;
+            effective_state_0 := ifx pink_state_0 != null then pink_state_0 else *local_state_0;
+            effective_state_1 := ifx pink_state_1 != null then pink_state_1 else *local_state_1;
+            effective_state_2 := ifx pink_state_2 != null then pink_state_2 else *local_state_2;
+
+            return generate_pink_noise_sample(effective_seed, effective_state_0, effective_state_1, effective_state_2);
 
         case;
             return 0.0;
@@ -153,7 +267,6 @@ calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_her
     raw_a0 := 1.0 + alpha;
     raw_a1 := -2.0 * cosine_value;
     raw_a2 := 1.0 - alpha;
-
 
     if filter_type == {
         case .LOWPASS;
@@ -213,6 +326,7 @@ Biquad_Coefficients :: struct {
 Synthesizer_Voice :: struct {
     configuration: Synthesizer_Configuration;
     oscillator_phase: float64 = 0.0;
+    oscillator_2_phase: float64 = 0.0;
     frequency_hertz: float = 440.0;
     midi_note_number: s32 = 60;
     velocity: float = 1.0;
@@ -221,4 +335,8 @@ Synthesizer_Voice :: struct {
     filter_state_2: float = 0.0;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
     is_active: bool = false;
+    noise_seed: u32 = 1234567;
+    pink_noise_state_0: float = 0.0;
+    pink_noise_state_1: float = 0.0;
+    pink_noise_state_2: float = 0.0;
 }

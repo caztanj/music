@@ -85,8 +85,16 @@ string_to_waveform_type :: (name: string) -> Waveform_Type, bool {
         return .SINE, true;
     }
 
-    if name == "triangle" {
+    if name == "triangle" || name == "tri" {
         return .TRIANGLE, true;
+    }
+
+    if name == "white" || name == "white_noise" || name == "noise" {
+        return .WHITE_NOISE, true;
+    }
+
+    if name == "pink" || name == "pink_noise" {
+        return .PINK_NOISE, true;
     }
 
     return .SAWTOOTH, false;
@@ -122,6 +130,12 @@ waveform_type_to_string :: (waveform_type: Waveform_Type) -> string {
         case .TRIANGLE;
             return "triangle";
 
+        case .WHITE_NOISE;
+            return "white_noise";
+
+        case .PINK_NOISE;
+            return "pink_noise";
+
         case;
             return "unknown";
     }
@@ -151,6 +165,8 @@ Waveform_Type :: enum {
     SQUARE;
     SINE;
     TRIANGLE;
+    WHITE_NOISE;
+    PINK_NOISE;
 }
 
 Filter_Type :: enum {
@@ -195,6 +211,13 @@ Sampler_Configuration :: struct {
 
 Synthesizer_Configuration :: struct {
     waveform: Waveform_Type = .SAWTOOTH;
+    oscillator_2_enabled: bool = false;
+    oscillator_2_waveform: Waveform_Type = .SAWTOOTH;
+    oscillator_2_semitones: s32 = 0;
+    oscillator_2_cents: float = 0.0;
+    oscillator_mix: float = 0.5;
+    noise_level: float = 0.0;
+    noise_type: Waveform_Type = .WHITE_NOISE;
     filter: Filter_Configuration;
     envelope: Envelope_Configuration;
     gain: float = 1.0;

@@ -374,6 +374,48 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
             release_value, release_success := parse_number(parser);
             if !release_success return false;
             synthesizer_configuration.envelope.release_milliseconds = cast(float) release_value;
+        } else if parameter_name == "wave2" || parameter_name == "waveform2" || parameter_name == "osc2_wave" || parameter_name == "osc2" {
+            wave_token := current_token(parser);
+            wave_name := ifx wave_token.type == .STRING then wave_token.string_value else wave_token.text;
+            waveform_type, waveform_success := string_to_waveform_type(wave_name);
+            if !waveform_success {
+                set_error(parser, wave_token.location, sprint("Unknown secondary waveform '%'", wave_name));
+                return false;
+            }
+            synthesizer_configuration.oscillator_2_waveform = waveform_type;
+            synthesizer_configuration.oscillator_2_enabled = true;
+            advance_token(parser);
+        } else if parameter_name == "osc2_transpose" || parameter_name == "transpose2" || parameter_name == "coarse2" || parameter_name == "semitones2" {
+            semitones_value, semitones_success := parse_number(parser);
+            if !semitones_success return false;
+            synthesizer_configuration.oscillator_2_semitones = cast(s32) semitones_value;
+            synthesizer_configuration.oscillator_2_enabled = true;
+        } else if parameter_name == "osc2_tune" || parameter_name == "tune2" || parameter_name == "cents2" || parameter_name == "detune2" {
+            cents_value, cents_success := parse_number(parser);
+            if !cents_success return false;
+            synthesizer_configuration.oscillator_2_cents = cast(float) cents_value;
+            synthesizer_configuration.oscillator_2_enabled = true;
+        } else if parameter_name == "osc_mix" || parameter_name == "mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            synthesizer_configuration.oscillator_mix = cast(float) mix_value;
+        } else if parameter_name == "noise_level" || parameter_name == "noise_gain" || parameter_name == "noise_mix" {
+            noise_value, noise_success := parse_number(parser);
+            if !noise_success return false;
+            synthesizer_configuration.noise_level = cast(float) noise_value;
+        } else if parameter_name == "noise_type" || parameter_name == "noise" {
+            noise_token := current_token(parser);
+            noise_name := ifx noise_token.type == .STRING then noise_token.string_value else noise_token.text;
+            waveform_type, waveform_success := string_to_waveform_type(noise_name);
+            if !waveform_success || (waveform_type != .WHITE_NOISE && waveform_type != .PINK_NOISE) {
+                set_error(parser, noise_token.location, sprint("Unknown noise type '%', expected 'white' or 'pink'", noise_name));
+                return false;
+            }
+            synthesizer_configuration.noise_type = waveform_type;
+            if synthesizer_configuration.noise_level == 0.0 {
+                synthesizer_configuration.noise_level = 0.5;
+            }
+            advance_token(parser);
         } else if parameter_name == "gain" || parameter_name == "volume" {
             gain_value, gain_success := parse_number(parser);
             if !gain_success return false;

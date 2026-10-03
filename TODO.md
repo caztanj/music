@@ -2,7 +2,7 @@
 
 | Phase | Milestone | Primary Deliverable | Status |
 |---|---|---|:---:|
-| **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | ⬜ Planned |
+| **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟡 In Progress |
 | **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | ⬜ Planned |
 | **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | ⬜ Planned |
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
@@ -17,10 +17,10 @@
 
 > **Goal**: Transform the synthesizer into a versatile, rich sound design engine capable of thick basslines, lush pads, sharp plucks, and aggressive leads.
 
-- [ ] **10.1 Dual Oscillators & Noise Generator (`src/dsp/synth.jai`)**
-  - [ ] Support secondary oscillator with independent waveform, coarse transpose (semitones), and fine tune (cents).
-  - [ ] Oscillator mix balance (Osc 1 vs Osc 2).
-  - [ ] White and Pink noise generator for percussion layering, ambient textures, and sound effects.
+- [x] **10.1 Dual Oscillators & Noise Generator (`src/dsp/synth.jai`)**
+  - [x] Support secondary oscillator with independent waveform, coarse transpose (semitones), and fine tune (cents).
+  - [x] Oscillator mix balance (Osc 1 vs Osc 2).
+  - [x] White and Pink noise generator for percussion layering, ambient textures, and sound effects.
 - [ ] **10.2 Stereo Unison & Hyper-Detune**
   - [ ] Polyphonic voice stacking (2, 4, 8 unison voices per note).
   - [ ] Configurable stereo spread and detune amount for classic "supersaw" leads and wide reese basses.

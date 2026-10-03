@@ -137,4 +137,102 @@ synth_tests :: () {
         expect_true(!is_synthesizer_voice_active(*voice));
         expect_equals(voice.oscillator_phase, 0.0);
     });
+
+    test("white_and_pink_noise_generation", () {
+        seed: u32 = 1234567;
+        state_0: float = 0.0;
+        state_1: float = 0.0;
+        state_2: float = 0.0;
+
+        sample_index := 0;
+        has_non_zero_white := false;
+        has_non_zero_pink := false;
+
+        while sample_index < 1000 {
+            white_sample := generate_white_noise_sample(*seed);
+            expect_true(white_sample >= -1.0 && white_sample <= 1.0);
+            if abs(white_sample) > 0.01 {
+                has_non_zero_white = true;
+            }
+
+            pink_sample := generate_pink_noise_sample(*seed, *state_0, *state_1, *state_2);
+            expect_true(pink_sample >= -1.5 && pink_sample <= 1.5);
+            if abs(pink_sample) > 0.01 {
+                has_non_zero_pink = true;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(has_non_zero_white);
+        expect_true(has_non_zero_pink);
+    });
+
+    test("calculate_detuned_frequency", () {
+        expect_near(calculate_detuned_frequency(440.0, 0, 0.0), 440.0, 0.001);
+        expect_near(calculate_detuned_frequency(440.0, 12, 0.0), 880.0, 0.001);
+        expect_near(calculate_detuned_frequency(440.0, -12, 0.0), 220.0, 0.001);
+        expect_near(calculate_detuned_frequency(440.0, 7, 0.0), 659.255, 0.01);
+        expect_near(calculate_detuned_frequency(440.0, 0, 100.0), 466.164, 0.01);
+    });
+
+    test("dual_oscillator_rendering_and_noise_layer", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.oscillator_2_enabled = true;
+        configuration.oscillator_2_waveform = .SQUARE;
+        configuration.oscillator_2_semitones = -12;
+        configuration.oscillator_2_cents = 10.0;
+        configuration.oscillator_mix = 0.5;
+        configuration.noise_level = 0.1;
+        configuration.noise_type = .PINK_NOISE;
+        configuration.envelope.attack_milliseconds = 2.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.envelope.release_milliseconds = 50.0;
+        configuration.gain = 0.9;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+        expect_true(is_synthesizer_voice_active(*voice));
+
+        sample_index := 0;
+        has_non_zero_sample := false;
+        has_glitch := false;
+
+        while sample_index < 1000 {
+            sample_value := render_synthesizer_sample(*voice);
+            is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+            if is_nan_value || is_inf_value {
+                has_glitch = true;
+            }
+            if abs(sample_value) > 0.01 {
+                has_non_zero_sample = true;
+            }
+            sample_index += 1;
+        }
+
+        expect_true(!has_glitch);
+        expect_true(has_non_zero_sample);
+    });
+
+    test("synthesizer_parser_dual_oscillator_and_noise_arguments", () {
+        song_text := "[project]\nname = \"Synth Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\", wave2=\"square\", osc2_transpose=-12, osc2_tune=15, mix=0.4, noise=\"pink\", noise_level=0.2)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        instrument, instrument_found := find_instrument(*specification, "lead");
+        expect_true(instrument_found);
+        expect_equals(instrument.synthesizer.waveform, Waveform_Type.SAWTOOTH);
+        expect_true(instrument.synthesizer.oscillator_2_enabled);
+        expect_equals(instrument.synthesizer.oscillator_2_waveform, Waveform_Type.SQUARE);
+        expect_equals(instrument.synthesizer.oscillator_2_semitones, -12);
+        expect_near(instrument.synthesizer.oscillator_2_cents, 15.0, 0.001);
+        expect_near(instrument.synthesizer.oscillator_mix, 0.4, 0.001);
+        expect_equals(instrument.synthesizer.noise_type, Waveform_Type.PINK_NOISE);
+        expect_near(instrument.synthesizer.noise_level, 0.2, 0.001);
+    });
 }
