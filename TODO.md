@@ -3,7 +3,7 @@
 | Phase | Milestone | Primary Deliverable | Status |
 |---|---|---|:---:|
 | **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
-| **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟡 In Progress |
+| **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟢 Completed |
 | **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | ⬜ Planned |
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
 | **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | ⬜ Planned |
@@ -51,8 +51,8 @@
 - [x] **11.3 Chorus & Flanger Insert**
   - [x] Modulated short delay lines (1–20 ms) with stereo phase offset for spatial widening and lush chorusing.
   - [x] Depth, Rate, Feedback, and Mix controls.
-- [ ] **11.4 Soft Saturation & Overdrive**
-  - [ ] Hyperbolic tangent (tanh) and cubic waveshaping saturation for analog warmth, presence, and grit.
+- [x] **11.4 Soft Saturation & Overdrive**
+  - [x] Hyperbolic tangent (tanh) and cubic waveshaping saturation for analog warmth, presence, and grit.
 
 **Acceptance Criteria**: Dry synth leads and snare drums gain convincing spatial acoustics and tonal clarity without phase cancellation or clipping.
 

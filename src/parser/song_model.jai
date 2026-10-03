@@ -132,6 +132,26 @@ string_to_filter_type :: (name: string) -> Filter_Type, bool {
     return .NONE, false;
 }
 
+string_to_saturation_type :: (name: string) -> Saturation_Type, bool {
+    if name == "tanh" || name == "soft" || name == "tape" {
+        return .TANH, true;
+    }
+
+    if name == "cubic" || name == "warmth" || name == "warm" {
+        return .CUBIC, true;
+    }
+
+    if name == "hard_clip" || name == "hard" || name == "clip" {
+        return .HARD_CLIP, true;
+    }
+
+    if name == "none" || name == "off" {
+        return .NONE, true;
+    }
+
+    return .NONE, false;
+}
+
 string_to_lfo_waveform :: (name: string) -> LFO_Waveform, bool {
     if name == "sine" {
         return .SINE, true;
@@ -232,6 +252,25 @@ filter_type_to_string :: (filter_type: Filter_Type) -> string {
     }
 }
 
+saturation_type_to_string :: (saturation_type: Saturation_Type) -> string {
+    if saturation_type == {
+        case .TANH;
+            return "tanh";
+
+        case .CUBIC;
+            return "cubic";
+
+        case .HARD_CLIP;
+            return "hard_clip";
+
+        case .NONE;
+            return "none";
+
+        case;
+            return "unknown";
+    }
+}
+
 Waveform_Type :: enum {
     SAWTOOTH;
     SQUARE;
@@ -250,6 +289,13 @@ Filter_Type :: enum {
     HIGH_SHELF;
     PEAKING;
     NOTCH;
+}
+
+Saturation_Type :: enum {
+    NONE;
+    TANH;
+    CUBIC;
+    HARD_CLIP;
 }
 
 Instrument_Type :: enum {
@@ -392,6 +438,11 @@ Mixer_Track_Definition :: struct {
     chorus_feedback: float = 0.0;
     chorus_mix: float = 0.5;
     chorus_stereo_phase_degrees: float = 90.0;
+    saturation_enabled: bool = false;
+    saturation_type: Saturation_Type = .TANH;
+    saturation_drive: float = 1.0;
+    saturation_mix: float = 1.0;
+    saturation_output_gain: float = 1.0;
     output_target: string = "master";
     location: Source_Location;
 }
@@ -420,6 +471,11 @@ Master_Track_Definition :: struct {
     chorus_feedback: float = 0.0;
     chorus_mix: float = 0.5;
     chorus_stereo_phase_degrees: float = 90.0;
+    saturation_enabled: bool = false;
+    saturation_type: Saturation_Type = .TANH;
+    saturation_drive: float = 1.0;
+    saturation_mix: float = 1.0;
+    saturation_output_gain: float = 1.0;
     location: Source_Location;
 }
 

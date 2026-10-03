@@ -773,6 +773,108 @@ process_chorus_flanger :: (chorus_flanger: *Chorus_Flanger, input_left: float, i
     return output_left, output_right;
 }
 
+initialize_saturation_insert :: (saturation: *Saturation_Insert) {
+    saturation.enabled = false;
+    saturation.saturation_type = .TANH;
+    saturation.drive = 1.0;
+    saturation.mix = 1.0;
+    saturation.output_gain = 1.0;
+}
+
+configure_saturation_insert :: (
+    saturation: *Saturation_Insert,
+    saturation_type: Saturation_Type = .TANH,
+    drive: float = 1.0,
+    mix: float = 1.0,
+    output_gain: float = 1.0
+) {
+    saturation.saturation_type = saturation_type;
+    saturation.drive = drive;
+    if saturation.drive < 0.1 {
+        saturation.drive = 0.1;
+    } else if saturation.drive > 50.0 {
+        saturation.drive = 50.0;
+    }
+
+    saturation.mix = mix;
+    if saturation.mix < 0.0 {
+        saturation.mix = 0.0;
+    } else if saturation.mix > 1.0 {
+        saturation.mix = 1.0;
+    }
+
+    saturation.output_gain = output_gain;
+    if saturation.output_gain < 0.0 {
+        saturation.output_gain = 0.0;
+    } else if saturation.output_gain > 10.0 {
+        saturation.output_gain = 10.0;
+    }
+
+    saturation.enabled = (saturation_type != .NONE) && (saturation.mix > 0.0);
+}
+
+reset_saturation_insert :: (saturation: *Saturation_Insert) {
+}
+
+process_saturation_sample :: (saturation: *Saturation_Insert, input_sample: float) -> float {
+    if !saturation.enabled || saturation.saturation_type == .NONE {
+        return input_sample;
+    }
+
+    driven_sample := cast(float64) (input_sample * saturation.drive);
+    saturated_sample: float64 = 0.0;
+
+    if saturation.saturation_type == {
+        case .TANH;
+            if driven_sample > 20.0 {
+                saturated_sample = 1.0;
+            } else if driven_sample < -20.0 {
+                saturated_sample = -1.0;
+            } else {
+                exponential := exp(2.0 * driven_sample);
+                saturated_sample = (exponential - 1.0) / (exponential + 1.0);
+            }
+
+        case .CUBIC;
+            if driven_sample > 1.5 {
+                saturated_sample = 1.0;
+            } else if driven_sample < -1.5 {
+                saturated_sample = -1.0;
+            } else {
+                normalized_cubic := driven_sample / 1.5;
+                saturated_sample = 1.5 * (normalized_cubic - (normalized_cubic * normalized_cubic * normalized_cubic) / 3.0);
+            }
+
+        case .HARD_CLIP;
+            if driven_sample > 1.0 {
+                saturated_sample = 1.0;
+            } else if driven_sample < -1.0 {
+                saturated_sample = -1.0;
+            } else {
+                saturated_sample = driven_sample;
+            }
+
+        case;
+            saturated_sample = driven_sample;
+    }
+
+    processed_sample := cast(float) saturated_sample * saturation.output_gain;
+    final_sample := input_sample * (1.0 - saturation.mix) + processed_sample * saturation.mix;
+
+    return final_sample;
+}
+
+process_saturation_insert :: (saturation: *Saturation_Insert, input_left: float, input_right: float) -> float, float {
+    if !saturation.enabled || saturation.saturation_type == .NONE {
+        return input_left, input_right;
+    }
+
+    output_left := process_saturation_sample(saturation, input_left);
+    output_right := process_saturation_sample(saturation, input_right);
+
+    return output_left, output_right;
+}
+
 MAXIMUM_DELAY_FRAMES :: 96000;
 MAXIMUM_PREDELAY_FRAMES :: 24000;
 REVERB_COMB_COUNT :: 8;
@@ -882,4 +984,13 @@ Chorus_Flanger :: struct {
     stereo_phase_degrees: float = 90.0;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
 }
+
+Saturation_Insert :: struct {
+    enabled: bool = false;
+    saturation_type: Saturation_Type = .TANH;
+    drive: float = 1.0;
+    mix: float = 1.0;
+    output_gain: float = 1.0;
+}
+
 

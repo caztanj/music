@@ -15,12 +15,14 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         channel.delay_enabled = false;
         channel.reverb_enabled = false;
         channel.equalizer_enabled = false;
+        channel.saturation_enabled = false;
         channel.chorus_flanger_enabled = false;
         channel.filter_enabled = false;
 
         initialize_stereo_delay(*channel.stereo_delay, sample_rate);
         initialize_studio_reverb(*channel.reverb, sample_rate);
         initialize_parametric_equalizer(*channel.equalizer, sample_rate);
+        initialize_saturation_insert(*channel.saturation);
         initialize_chorus_flanger(*channel.chorus_flanger, sample_rate);
         initialize_filter_insert(*channel.filter_insert, sample_rate);
 
@@ -32,6 +34,8 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
     initialize_studio_reverb(*mixer.master.reverb, sample_rate);
     mixer.master.equalizer_enabled = false;
     initialize_parametric_equalizer(*mixer.master.equalizer, sample_rate);
+    mixer.master.saturation_enabled = false;
+    initialize_saturation_insert(*mixer.master.saturation);
     mixer.master.chorus_flanger_enabled = false;
     initialize_chorus_flanger(*mixer.master.chorus_flanger, sample_rate);
     mixer.master.limiter_enabled = true;
@@ -109,6 +113,17 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                     stereo_phase_degrees = track_definition.chorus_stereo_phase_degrees
                 );
             }
+
+            if track_definition.saturation_enabled {
+                channel.saturation_enabled = true;
+                configure_saturation_insert(
+                    *channel.saturation,
+                    saturation_type = track_definition.saturation_type,
+                    drive = track_definition.saturation_drive,
+                    mix = track_definition.saturation_mix,
+                    output_gain = track_definition.saturation_output_gain
+                );
+            }
         }
 
         definition_index += 1;
@@ -139,6 +154,17 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
             mixer_definition.master.equalizer_mid_frequency_hertz,
             mixer_definition.master.equalizer_mid_quality_factor,
             mixer_definition.master.equalizer_high_frequency_hertz
+        );
+    }
+
+    if mixer_definition.master.saturation_enabled {
+        mixer.master.saturation_enabled = true;
+        configure_saturation_insert(
+            *mixer.master.saturation,
+            saturation_type = mixer_definition.master.saturation_type,
+            drive = mixer_definition.master.saturation_drive,
+            mix = mixer_definition.master.saturation_mix,
+            output_gain = mixer_definition.master.saturation_output_gain
         );
     }
 
@@ -255,6 +281,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                     left_sample, right_sample = process_parametric_equalizer(*channel.equalizer, left_sample, right_sample);
                 }
 
+                if channel.saturation_enabled {
+                    left_sample, right_sample = process_saturation_insert(*channel.saturation, left_sample, right_sample);
+                }
+
                 if channel.filter_enabled {
                     left_sample, right_sample = process_filter_insert(*channel.filter_insert, left_sample, right_sample);
                 }
@@ -288,6 +318,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
 
         if mixer.master.equalizer_enabled {
             master_left, master_right = process_parametric_equalizer(*mixer.master.equalizer, master_left, master_right);
+        }
+
+        if mixer.master.saturation_enabled {
+            master_left, master_right = process_saturation_insert(*mixer.master.saturation, master_left, master_right);
         }
 
         if mixer.master.chorus_flanger_enabled {
@@ -337,6 +371,8 @@ Mixer_Channel :: struct {
     output_target: string = "master";
     equalizer: Parametric_Equalizer;
     equalizer_enabled: bool = false;
+    saturation: Saturation_Insert;
+    saturation_enabled: bool = false;
     chorus_flanger: Chorus_Flanger;
     chorus_flanger_enabled: bool = false;
     stereo_delay: Stereo_Delay;
@@ -353,6 +389,8 @@ Master_Channel :: struct {
     gain: float = 1.0;
     equalizer: Parametric_Equalizer;
     equalizer_enabled: bool = false;
+    saturation: Saturation_Insert;
+    saturation_enabled: bool = false;
     chorus_flanger: Chorus_Flanger;
     chorus_flanger_enabled: bool = false;
     reverb: Studio_Reverb;

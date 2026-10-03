@@ -386,4 +386,92 @@ effects_tests :: () {
         expect_near(mixer.master.chorus_flanger.rate_hertz, 0.5, 0.001);
         expect_near(mixer.master.chorus_flanger.feedback, 0.7, 0.001);
     });
+
+    test("saturation_tanh_soft_compression", () {
+        saturation: Saturation_Insert;
+        initialize_saturation_insert(*saturation);
+        configure_saturation_insert(*saturation, saturation_type = .TANH, drive = 3.0, mix = 1.0, output_gain = 1.0);
+
+        small_left, small_right := process_saturation_insert(*saturation, 0.1, -0.1);
+        expect_near(small_left, 0.2913, 0.005);
+        expect_near(small_right, -0.2913, 0.005);
+
+        high_left, high_right := process_saturation_insert(*saturation, 1.0, -1.0);
+        expect_near(high_left, 0.9950, 0.005);
+        expect_near(high_right, -0.9950, 0.005);
+
+        overdriven_left, overdriven_right := process_saturation_insert(*saturation, 50.0, -50.0);
+        expect_near(overdriven_left, 1.0, 0.0001);
+        expect_near(overdriven_right, -1.0, 0.0001);
+    });
+
+    test("saturation_cubic_and_hard_clip", () {
+        cubic_saturation: Saturation_Insert;
+        initialize_saturation_insert(*cubic_saturation);
+        configure_saturation_insert(*cubic_saturation, saturation_type = .CUBIC, drive = 1.0, mix = 1.0, output_gain = 1.0);
+
+        cubic_peak_left, _ := process_saturation_insert(*cubic_saturation, 1.5, 1.5);
+        expect_near(cubic_peak_left, 1.0, 0.001);
+
+        cubic_clipped_left, _ := process_saturation_insert(*cubic_saturation, 2.5, 2.5);
+        expect_near(cubic_clipped_left, 1.0, 0.001);
+
+        hard_saturation: Saturation_Insert;
+        initialize_saturation_insert(*hard_saturation);
+        configure_saturation_insert(*hard_saturation, saturation_type = .HARD_CLIP, drive = 2.0, mix = 1.0, output_gain = 1.0);
+
+        hard_linear_left, _ := process_saturation_insert(*hard_saturation, 0.3, 0.3);
+        expect_near(hard_linear_left, 0.6, 0.001);
+
+        hard_clipped_left, hard_clipped_right := process_saturation_insert(*hard_saturation, 0.8, -0.8);
+        expect_near(hard_clipped_left, 1.0, 0.001);
+        expect_near(hard_clipped_right, -1.0, 0.001);
+    });
+
+    test("saturation_mix_and_bypass", () {
+        saturation: Saturation_Insert;
+        initialize_saturation_insert(*saturation);
+        configure_saturation_insert(*saturation, saturation_type = .TANH, drive = 5.0, mix = 0.0, output_gain = 1.0);
+
+        bypass_left, bypass_right := process_saturation_insert(*saturation, 0.75, -0.42);
+        expect_near(bypass_left, 0.75, 0.0001);
+        expect_near(bypass_right, -0.42, 0.0001);
+
+        configure_saturation_insert(*saturation, saturation_type = .TANH, drive = 2.0, mix = 0.5, output_gain = 1.0);
+        half_mix_left, _ := process_saturation_insert(*saturation, 1.0, 1.0);
+        expected_half := (1.0 + 0.9640) * 0.5;
+        expect_near(half_mix_left, cast(float) expected_half, 0.01);
+    });
+
+    test("mixer_parser_saturation_arguments", () {
+        song_text := "[project]\nname = \"Saturation Mixer Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\")\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 0.8, saturation = \"cubic\", drive = 2.5, saturation_mix = 0.75, saturation_gain = 0.9, output = master\nmaster: gain = 1.0, saturation = \"tanh\", drive = 1.5, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        track := *specification.mixer.tracks[0];
+        expect_true(track.saturation_enabled);
+        expect_true(track.saturation_type == .CUBIC);
+        expect_near(track.saturation_drive, 2.5, 0.001);
+        expect_near(track.saturation_mix, 0.75, 0.001);
+        expect_near(track.saturation_output_gain, 0.9, 0.001);
+
+        expect_true(specification.mixer.master.saturation_enabled);
+        expect_true(specification.mixer.master.saturation_type == .TANH);
+        expect_near(specification.mixer.master.saturation_drive, 1.5, 0.001);
+
+        mixer: Mixer;
+        configure_mixer_from_definition(*mixer, specification.mixer, 44100, 120.0);
+        defer deinitialize_mixer(*mixer);
+
+        expect_true(mixer.tracks[0].saturation_enabled);
+        expect_true(mixer.tracks[0].saturation.saturation_type == .CUBIC);
+        expect_near(mixer.tracks[0].saturation.drive, 2.5, 0.001);
+        expect_near(mixer.tracks[0].saturation.mix, 0.75, 0.001);
+        expect_near(mixer.tracks[0].saturation.output_gain, 0.9, 0.001);
+
+        expect_true(mixer.master.saturation_enabled);
+        expect_true(mixer.master.saturation.saturation_type == .TANH);
+        expect_near(mixer.master.saturation.drive, 1.5, 0.001);
+    });
 }

@@ -886,6 +886,56 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if !phase_success return false;
             track.chorus_stereo_phase_degrees = cast(float) phase_value;
             track.chorus_enabled = true;
+        } else if parameter_name == "saturation_type" || parameter_name == "saturation_mode" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER && type_token.type != .STRING {
+                set_error(parser, type_token.location, "Expected saturation type name");
+                return false;
+            }
+            type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+            saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+            if !saturation_type_found {
+                set_error(parser, type_token.location, sprint("Unknown saturation type '%'", type_text));
+                return false;
+            }
+            track.saturation_type = saturation_type;
+            track.saturation_enabled = saturation_type != .NONE;
+            advance_token(parser);
+        } else if parameter_name == "saturation" || parameter_name == "drive" || parameter_name == "saturation_drive" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER || type_token.type == .STRING {
+                type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+                saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+                if saturation_type_found {
+                    track.saturation_type = saturation_type;
+                    track.saturation_enabled = saturation_type != .NONE;
+                    advance_token(parser);
+                } else if type_text == "on" || type_text == "true" {
+                    track.saturation_enabled = true;
+                    advance_token(parser);
+                } else if type_text == "off" || type_text == "false" {
+                    track.saturation_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Unknown saturation parameter value '%'", type_text));
+                    return false;
+                }
+            } else {
+                drive_value, drive_success := parse_number(parser);
+                if !drive_success return false;
+                track.saturation_drive = cast(float) drive_value;
+                track.saturation_enabled = true;
+            }
+        } else if parameter_name == "saturation_mix" || parameter_name == "saturation_wet" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            track.saturation_mix = cast(float) mix_value;
+            track.saturation_enabled = true;
+        } else if parameter_name == "saturation_gain" || parameter_name == "saturation_output" || parameter_name == "saturation_out" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            track.saturation_output_gain = cast(float) gain_value;
+            track.saturation_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -1038,6 +1088,56 @@ parse_master_track_parameters :: (parser: *Parser, master_track: *Master_Track_D
             if !phase_success return false;
             master_track.chorus_stereo_phase_degrees = cast(float) phase_value;
             master_track.chorus_enabled = true;
+        } else if parameter_name == "saturation_type" || parameter_name == "saturation_mode" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER && type_token.type != .STRING {
+                set_error(parser, type_token.location, "Expected saturation type name");
+                return false;
+            }
+            type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+            saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+            if !saturation_type_found {
+                set_error(parser, type_token.location, sprint("Unknown saturation type '%'", type_text));
+                return false;
+            }
+            master_track.saturation_type = saturation_type;
+            master_track.saturation_enabled = saturation_type != .NONE;
+            advance_token(parser);
+        } else if parameter_name == "saturation" || parameter_name == "drive" || parameter_name == "saturation_drive" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER || type_token.type == .STRING {
+                type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+                saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+                if saturation_type_found {
+                    master_track.saturation_type = saturation_type;
+                    master_track.saturation_enabled = saturation_type != .NONE;
+                    advance_token(parser);
+                } else if type_text == "on" || type_text == "true" {
+                    master_track.saturation_enabled = true;
+                    advance_token(parser);
+                } else if type_text == "off" || type_text == "false" {
+                    master_track.saturation_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Unknown saturation parameter value '%'", type_text));
+                    return false;
+                }
+            } else {
+                drive_value, drive_success := parse_number(parser);
+                if !drive_success return false;
+                master_track.saturation_drive = cast(float) drive_value;
+                master_track.saturation_enabled = true;
+            }
+        } else if parameter_name == "saturation_mix" || parameter_name == "saturation_wet" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            master_track.saturation_mix = cast(float) mix_value;
+            master_track.saturation_enabled = true;
+        } else if parameter_name == "saturation_gain" || parameter_name == "saturation_output" || parameter_name == "saturation_out" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            master_track.saturation_output_gain = cast(float) gain_value;
+            master_track.saturation_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown master parameter '%'", parameter_name));
             return false;
