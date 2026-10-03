@@ -7,6 +7,7 @@ main :: () {
     parser_tests();
     envelope_tests();
     synth_tests();
+    sampler_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -62,6 +63,7 @@ current_test_failed := false;
 #load "parser/parser.jai";
 #load "dsp/envelope.jai";
 #load "dsp/synth.jai";
+#load "dsp/sampler.jai";
 #load "tests/common_tests.jai";
 #load "audio/tests/wav_export_tests.jai";
 #load "audio/tests/audio_backend_tests.jai";
@@ -70,6 +72,7 @@ current_test_failed := false;
 #load "parser/tests/parser_tests.jai";
 #load "dsp/tests/envelope_tests.jai";
 #load "dsp/tests/synth_tests.jai";
+#load "dsp/tests/sampler_tests.jai";
 
 #import "Basic";
 #import "Math";

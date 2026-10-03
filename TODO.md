@@ -100,10 +100,11 @@
   - [x] Resonant Biquad Filter (Lowpass, Highpass, Bandpass).
   - [x] Envelope modulation connected to amplifier and filter cutoff.
 
-- [ ] **4.3 Audio Sampler Engine (`src/dsp/sampler.jai`)**
-  - [ ] In-memory PCM audio buffer storage.
-  - [ ] Linear interpolation resampling for variable-pitch playback.
-  - [ ] One-shot trigger mode for drum hits.
+- [x] **4.3 Audio Sampler Engine (`src/dsp/sampler.jai`)**
+  - [x] In-memory PCM audio buffer storage.
+  - [x] Linear interpolation resampling for variable-pitch playback.
+  - [x] One-shot trigger mode for drum hits.
+
 - [ ] **4.4 Voice Manager (`src/engine/voice_manager.jai`)**
   - [ ] Pre-allocated pool of 64–128 concurrent active voices.
   - [ ] Deterministic voice stealing (steals released voices first, then lowest velocity/gain).

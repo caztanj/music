@@ -150,6 +150,7 @@ Command_Line_Options :: struct {
 #load "parser/parser.jai";
 #load "dsp/envelope.jai";
 #load "dsp/synth.jai";
+#load "dsp/sampler.jai";
 
 #import "Basic";
 #import "Math";
