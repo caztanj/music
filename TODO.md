@@ -2,7 +2,7 @@
 
 | Phase | Milestone | Primary Deliverable | Status |
 |---|---|---|:---:|
-| **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟡 In Progress |
+| **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
 | **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | ⬜ Planned |
 | **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | ⬜ Planned |
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
@@ -27,10 +27,10 @@
 - [x] **10.3 Dedicated Filter ADSR Envelope**
   - [x] Independent 4-stage ADSR envelope controlling filter cutoff frequency over time.
   - [x] Envelope modulation amount (bipolar: -100% to +100%) for classic synth brass, plucks, and squelchy bass.
-- [ ] **10.4 Low Frequency Oscillators (LFOs)**
-  - [ ] Dual LFOs with Sine, Triangle, Square, and Random (Sample & Hold) waveforms.
-  - [ ] Tempo sync modes (e.g. 1/1, 1/2, 1/4, 1/8, 1/16, triplets) or free Hertz rate.
-  - [ ] Mod destination matrix: Pitch (vibrato), Filter Cutoff (wobble/growl), Pan (auto-pan), Volume (tremolo).
+- [x] **10.4 Low Frequency Oscillators (LFOs)**
+  - [x] Dual LFOs with Sine, Triangle, Square, and Random (Sample & Hold) waveforms.
+  - [x] Tempo sync modes (e.g. 1/1, 1/2, 1/4, 1/8, 1/16, triplets) or free Hertz rate.
+  - [x] Mod destination matrix: Pitch (vibrato), Filter Cutoff (wobble/growl), Pan (auto-pan), Volume (tremolo).
 
 **Acceptance Criteria**: The synth produces convincing, rich supersaw chords, punchy plucked basses, and tempo-synced filter wobbles without external processing.
 

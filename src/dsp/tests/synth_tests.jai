@@ -426,4 +426,216 @@ synth_tests :: () {
         expect_near(instrument.synthesizer.filter.envelope.sustain_level, 0.2, 0.001);
         expect_near(instrument.synthesizer.filter.envelope.release_milliseconds, 120.0, 0.001);
     });
+
+    test("lfo_tempo_sync_rate_calculation", () {
+        configuration: LFO_Configuration;
+        configuration.is_tempo_synced = false;
+        configuration.rate_hertz = 3.5;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 3.5, 0.001);
+
+        configuration.is_tempo_synced = true;
+        configuration.tempo_sync_numerator = 1;
+        configuration.tempo_sync_denominator = 4;
+        configuration.is_triplet = false;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 2.0, 0.001);
+        expect_near(calculate_lfo_frequency_hertz(configuration, 60.0), 1.0, 0.001);
+
+        configuration.tempo_sync_denominator = 8;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 4.0, 0.001);
+
+        configuration.tempo_sync_denominator = 16;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 8.0, 0.001);
+
+        configuration.tempo_sync_denominator = 1;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 0.5, 0.001);
+
+        configuration.tempo_sync_denominator = 4;
+        configuration.is_triplet = true;
+        expect_near(calculate_lfo_frequency_hertz(configuration, 120.0), 3.0, 0.001);
+    });
+
+    test("lfo_pitch_vibrato_modulation", () {
+        unmodulated_configuration: Synthesizer_Configuration;
+        unmodulated_configuration.waveform = .SINE;
+        unmodulated_configuration.envelope.attack_milliseconds = 2.0;
+        unmodulated_configuration.envelope.decay_milliseconds = 50.0;
+        unmodulated_configuration.envelope.sustain_level = 1.0;
+        unmodulated_configuration.envelope.release_milliseconds = 50.0;
+
+        vibrato_configuration := unmodulated_configuration;
+        vibrato_configuration.lfo_1.enabled = true;
+        vibrato_configuration.lfo_1.waveform = .SINE;
+        vibrato_configuration.lfo_1.destination = .PITCH;
+        vibrato_configuration.lfo_1.rate_hertz = 5.0;
+        vibrato_configuration.lfo_1.amount = 1.0;
+
+        unmodulated_voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*unmodulated_voice, unmodulated_configuration, 44100);
+        trigger_synthesizer_note_on(*unmodulated_voice, 60, 1.0);
+
+        vibrato_voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*vibrato_voice, vibrato_configuration, 44100);
+        trigger_synthesizer_note_on(*vibrato_voice, 60, 1.0);
+
+        sample_index := 0;
+        difference_accumulated: float = 0.0;
+        has_glitch := false;
+
+        while sample_index < 1000 {
+            unmodulated_sample := render_synthesizer_sample(*unmodulated_voice);
+            vibrato_sample := render_synthesizer_sample(*vibrato_voice);
+
+            is_nan_sample, is_inf_sample := is_nan_is_inf(vibrato_sample);
+            if is_nan_sample || is_inf_sample {
+                has_glitch = true;
+            }
+
+            difference_accumulated += abs(vibrato_sample - unmodulated_sample);
+            sample_index += 1;
+        }
+
+        expect_true(!has_glitch);
+        expect_true(difference_accumulated > 10.0);
+    });
+
+    test("lfo_filter_cutoff_modulation", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.filter.type = .LOWPASS;
+        configuration.filter.cutoff_frequency_hertz = 500.0;
+        configuration.filter.resonance = 0.5;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 1.0;
+        configuration.envelope.release_milliseconds = 50.0;
+        configuration.lfo_1.enabled = true;
+        configuration.lfo_1.waveform = .SQUARE;
+        configuration.lfo_1.destination = .FILTER_CUTOFF;
+        configuration.lfo_1.rate_hertz = 10.0;
+        configuration.lfo_1.amount = 0.5;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        first_half_energy: float = 0.0;
+        second_half_energy: float = 0.0;
+
+        while sample_index < 4410 {
+            sample_value := render_synthesizer_sample(*voice);
+            if sample_index >= 500 && sample_index < 2000 {
+                first_half_energy += sample_value * sample_value;
+            } else if sample_index >= 2700 && sample_index < 4200 {
+                second_half_energy += sample_value * sample_value;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(first_half_energy > second_half_energy * 1.5);
+    });
+
+    test("lfo_auto_pan_modulation", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 1.0;
+        configuration.envelope.release_milliseconds = 50.0;
+        configuration.lfo_1.enabled = true;
+        configuration.lfo_1.waveform = .SQUARE;
+        configuration.lfo_1.destination = .PAN;
+        configuration.lfo_1.rate_hertz = 10.0;
+        configuration.lfo_1.amount = 1.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        first_half_left_energy: float = 0.0;
+        first_half_right_energy: float = 0.0;
+        second_half_left_energy: float = 0.0;
+        second_half_right_energy: float = 0.0;
+
+        while sample_index < 4410 {
+            left_sample, right_sample := render_synthesizer_frame(*voice);
+            if sample_index >= 500 && sample_index < 2000 {
+                first_half_left_energy += left_sample * left_sample;
+                first_half_right_energy += right_sample * right_sample;
+            } else if sample_index >= 2700 && sample_index < 4200 {
+                second_half_left_energy += left_sample * left_sample;
+                second_half_right_energy += right_sample * right_sample;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(first_half_right_energy > 1.0);
+        expect_near(first_half_left_energy, 0.0, 0.001);
+        expect_true(second_half_left_energy > 1.0);
+        expect_near(second_half_right_energy, 0.0, 0.001);
+    });
+
+    test("lfo_volume_tremolo_modulation", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 1.0;
+        configuration.envelope.release_milliseconds = 50.0;
+        configuration.lfo_1.enabled = true;
+        configuration.lfo_1.waveform = .SQUARE;
+        configuration.lfo_1.destination = .VOLUME;
+        configuration.lfo_1.rate_hertz = 10.0;
+        configuration.lfo_1.amount = 1.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        first_half_energy: float = 0.0;
+        second_half_energy: float = 0.0;
+
+        while sample_index < 4410 {
+            sample_value := render_synthesizer_sample(*voice);
+            if sample_index >= 500 && sample_index < 2000 {
+                first_half_energy += sample_value * sample_value;
+            } else if sample_index >= 2700 && sample_index < 4200 {
+                second_half_energy += sample_value * sample_value;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(first_half_energy > 1.0);
+        expect_near(second_half_energy, 0.0, 0.001);
+    });
+
+    test("synthesizer_parser_lfo_arguments", () {
+        song_text := "[project]\nname = \"LFO Parser Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\", lfo1_wave=\"triangle\", lfo1_dest=\"filter\", lfo1_rate=\"1/8\", lfo1_amount=0.6, lfo1_retrigger=\"off\", lfo2_wave=\"sine\", lfo2_dest=\"pan\", lfo2_speed=4.5, lfo2_depth=0.8)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        instrument, instrument_found := find_instrument(*specification, "lead");
+        expect_true(instrument_found);
+        expect_true(instrument.synthesizer.lfo_1.enabled);
+        expect_equals(instrument.synthesizer.lfo_1.waveform, LFO_Waveform.TRIANGLE);
+        expect_equals(instrument.synthesizer.lfo_1.destination, LFO_Destination.FILTER_CUTOFF);
+        expect_true(instrument.synthesizer.lfo_1.is_tempo_synced);
+        expect_equals(instrument.synthesizer.lfo_1.tempo_sync_numerator, 1);
+        expect_equals(instrument.synthesizer.lfo_1.tempo_sync_denominator, 8);
+        expect_near(instrument.synthesizer.lfo_1.amount, 0.6, 0.001);
+        expect_true(!instrument.synthesizer.lfo_1.retrigger);
+
+        expect_true(instrument.synthesizer.lfo_2.enabled);
+        expect_equals(instrument.synthesizer.lfo_2.waveform, LFO_Waveform.SINE);
+        expect_equals(instrument.synthesizer.lfo_2.destination, LFO_Destination.PAN);
+        expect_true(!instrument.synthesizer.lfo_2.is_tempo_synced);
+        expect_near(instrument.synthesizer.lfo_2.rate_hertz, 4.5, 0.001);
+        expect_near(instrument.synthesizer.lfo_2.amount, 0.8, 0.001);
+    });
 }

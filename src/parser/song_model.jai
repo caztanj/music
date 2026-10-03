@@ -116,6 +116,50 @@ string_to_filter_type :: (name: string) -> Filter_Type, bool {
     return .NONE, false;
 }
 
+string_to_lfo_waveform :: (name: string) -> LFO_Waveform, bool {
+    if name == "sine" {
+        return .SINE, true;
+    }
+
+    if name == "triangle" || name == "tri" {
+        return .TRIANGLE, true;
+    }
+
+    if name == "square" || name == "pulse" {
+        return .SQUARE, true;
+    }
+
+    if name == "sample_and_hold" || name == "random" || name == "sh" {
+        return .SAMPLE_AND_HOLD, true;
+    }
+
+    return .SINE, false;
+}
+
+string_to_lfo_destination :: (name: string) -> LFO_Destination, bool {
+    if name == "pitch" || name == "vibrato" || name == "tune" {
+        return .PITCH, true;
+    }
+
+    if name == "filter" || name == "cutoff" || name == "filter_cutoff" {
+        return .FILTER_CUTOFF, true;
+    }
+
+    if name == "pan" || name == "panning" {
+        return .PAN, true;
+    }
+
+    if name == "volume" || name == "gain" || name == "tremolo" {
+        return .VOLUME, true;
+    }
+
+    if name == "none" {
+        return .NONE, true;
+    }
+
+    return .NONE, false;
+}
+
 waveform_type_to_string :: (waveform_type: Waveform_Type) -> string {
     if waveform_type == {
         case .SAWTOOTH;
@@ -205,6 +249,34 @@ Filter_Configuration :: struct {
     envelope: Envelope_Configuration;
 }
 
+LFO_Waveform :: enum {
+    SINE;
+    TRIANGLE;
+    SQUARE;
+    SAMPLE_AND_HOLD;
+}
+
+LFO_Destination :: enum {
+    NONE;
+    PITCH;
+    FILTER_CUTOFF;
+    PAN;
+    VOLUME;
+}
+
+LFO_Configuration :: struct {
+    enabled: bool = false;
+    waveform: LFO_Waveform = .SINE;
+    destination: LFO_Destination = .NONE;
+    rate_hertz: float = 2.0;
+    is_tempo_synced: bool = false;
+    tempo_sync_numerator: s32 = 1;
+    tempo_sync_denominator: s32 = 4;
+    is_triplet: bool = false;
+    amount: float = 0.0;
+    retrigger: bool = true;
+}
+
 Sampler_Configuration :: struct {
     sample_file_path: string;
     gain: float = 1.0;
@@ -225,6 +297,8 @@ Synthesizer_Configuration :: struct {
     unison_spread: float = 1.0;
     filter: Filter_Configuration;
     envelope: Envelope_Configuration;
+    lfo_1: LFO_Configuration;
+    lfo_2: LFO_Configuration;
     gain: float = 1.0;
 }
 

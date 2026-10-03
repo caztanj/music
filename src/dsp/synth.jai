@@ -1,10 +1,17 @@
-initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synthesizer_Configuration, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synthesizer_Configuration, sample_rate: s64 = DEFAULT_SAMPLE_RATE, beats_per_minute: float = 120.0) {
     voice.configuration = configuration;
     voice.sample_rate = sample_rate;
+    voice.beats_per_minute = beats_per_minute;
     voice.is_active = false;
     voice.oscillator_phase = 0.0;
     voice.oscillator_2_phase = 0.0;
     voice.noise_seed = 1234567;
+    voice.lfo_1_phase = 0.0;
+    voice.lfo_2_phase = 0.0;
+    voice.lfo_1_noise_seed = 4321987;
+    voice.lfo_2_noise_seed = 9876543;
+    voice.lfo_1_random_value = generate_white_noise_sample(*voice.lfo_1_noise_seed);
+    voice.lfo_2_random_value = generate_white_noise_sample(*voice.lfo_2_noise_seed);
     voice.pink_noise_state_0 = 0.0;
     voice.pink_noise_state_1 = 0.0;
     voice.pink_noise_state_2 = 0.0;
@@ -30,6 +37,16 @@ trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32
     voice.velocity = velocity;
     voice.is_active = true;
     voice.noise_seed ^= cast(u32) (midi_note_number * 104729 + 19);
+
+    if voice.configuration.lfo_1.retrigger {
+        voice.lfo_1_phase = 0.0;
+        voice.lfo_1_random_value = generate_white_noise_sample(*voice.lfo_1_noise_seed);
+    }
+
+    if voice.configuration.lfo_2.retrigger {
+        voice.lfo_2_phase = 0.0;
+        voice.lfo_2_random_value = generate_white_noise_sample(*voice.lfo_2_noise_seed);
+    }
 
     golden_ratio_fraction := 0.618033988749895;
     unison_index := 0;
@@ -57,6 +74,10 @@ reset_synthesizer_voice :: (voice: *Synthesizer_Voice) {
     voice.is_active = false;
     voice.oscillator_phase = 0.0;
     voice.oscillator_2_phase = 0.0;
+    voice.lfo_1_phase = 0.0;
+    voice.lfo_2_phase = 0.0;
+    voice.lfo_1_random_value = 0.0;
+    voice.lfo_2_random_value = 0.0;
     voice.pink_noise_state_0 = 0.0;
     voice.pink_noise_state_1 = 0.0;
     voice.pink_noise_state_2 = 0.0;
@@ -128,6 +149,101 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
 
     filter_envelope_level := process_envelope_sample(*voice.filter_envelope);
 
+    pitch_modulation_cents: float = 0.0;
+    filter_modulation_octaves: float = 0.0;
+    pan_modulation: float = 0.0;
+    volume_modulation: float = 0.0;
+
+    if voice.configuration.lfo_1.enabled && voice.configuration.lfo_1.destination != .NONE {
+        lfo_frequency := calculate_lfo_frequency_hertz(voice.configuration.lfo_1, voice.beats_per_minute);
+        phase_increment := cast(float64) lfo_frequency / cast(float64) voice.sample_rate;
+        lfo_sample := generate_lfo_sample(voice.configuration.lfo_1.waveform, voice.lfo_1_phase, voice.lfo_1_random_value);
+
+        voice.lfo_1_phase += phase_increment;
+        if voice.lfo_1_phase >= 1.0 {
+            voice.lfo_1_phase -= cast(float64) cast(s64) voice.lfo_1_phase;
+            voice.lfo_1_random_value = generate_white_noise_sample(*voice.lfo_1_noise_seed);
+        }
+
+        amount := voice.configuration.lfo_1.amount;
+        if voice.configuration.lfo_1.destination == {
+            case .PITCH;
+                if amount > 12.0 || amount < -12.0 {
+                    pitch_modulation_cents += lfo_sample * amount;
+                } else {
+                    pitch_modulation_cents += lfo_sample * amount * 100.0;
+                }
+
+            case .FILTER_CUTOFF;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                filter_modulation_octaves += lfo_sample * normalized_amount * 5.0;
+
+            case .PAN;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                pan_modulation += lfo_sample * normalized_amount;
+
+            case .VOLUME;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                volume_modulation += lfo_sample * normalized_amount;
+
+            case;
+        }
+    }
+
+    if voice.configuration.lfo_2.enabled && voice.configuration.lfo_2.destination != .NONE {
+        lfo_frequency := calculate_lfo_frequency_hertz(voice.configuration.lfo_2, voice.beats_per_minute);
+        phase_increment := cast(float64) lfo_frequency / cast(float64) voice.sample_rate;
+        lfo_sample := generate_lfo_sample(voice.configuration.lfo_2.waveform, voice.lfo_2_phase, voice.lfo_2_random_value);
+
+        voice.lfo_2_phase += phase_increment;
+        if voice.lfo_2_phase >= 1.0 {
+            voice.lfo_2_phase -= cast(float64) cast(s64) voice.lfo_2_phase;
+            voice.lfo_2_random_value = generate_white_noise_sample(*voice.lfo_2_noise_seed);
+        }
+
+        amount := voice.configuration.lfo_2.amount;
+        if voice.configuration.lfo_2.destination == {
+            case .PITCH;
+                if amount > 12.0 || amount < -12.0 {
+                    pitch_modulation_cents += lfo_sample * amount;
+                } else {
+                    pitch_modulation_cents += lfo_sample * amount * 100.0;
+                }
+
+            case .FILTER_CUTOFF;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                filter_modulation_octaves += lfo_sample * normalized_amount * 5.0;
+
+            case .PAN;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                pan_modulation += lfo_sample * normalized_amount;
+
+            case .VOLUME;
+                normalized_amount := amount;
+                if normalized_amount > 1.0 || normalized_amount < -1.0 {
+                    normalized_amount /= 100.0;
+                }
+                volume_modulation += lfo_sample * normalized_amount;
+
+            case;
+        }
+    }
+
     unison_voice_count := voice.configuration.unison_voices;
     if unison_voice_count < 1 {
         unison_voice_count = 1;
@@ -154,7 +270,9 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
             pan_factor = normalized_spread * voice.configuration.unison_spread;
         }
 
-        voice_frequency := calculate_detuned_frequency(voice.frequency_hertz, 0, cents_offset);
+        pan_factor += pan_modulation;
+
+        voice_frequency := calculate_detuned_frequency(voice.frequency_hertz, 0, cents_offset + pitch_modulation_cents);
         phase_increment := cast(float64) voice_frequency / cast(float64) voice.sample_rate;
         current_phase := voice.unison_phases[unison_index];
 
@@ -244,6 +362,8 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
 
     if voice.configuration.filter.type != .NONE {
         effective_cutoff := voice.configuration.filter.cutoff_frequency_hertz;
+        total_cutoff_octaves := 0.0;
+
         if voice.configuration.filter.envelope_amount != 0.0 {
             modulation_amount := voice.configuration.filter.envelope_amount;
             if modulation_amount > 1.0 || modulation_amount < -1.0 {
@@ -251,7 +371,13 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
             }
 
             octave_range := 5.0;
-            cutoff_multiplier := cast(float) pow(2.0, cast(float64) (filter_envelope_level * modulation_amount * octave_range));
+            total_cutoff_octaves += filter_envelope_level * modulation_amount * octave_range;
+        }
+
+        total_cutoff_octaves += filter_modulation_octaves;
+
+        if total_cutoff_octaves != 0.0 {
+            cutoff_multiplier := cast(float) pow(2.0, cast(float64) total_cutoff_octaves);
             effective_cutoff *= cutoff_multiplier;
         }
 
@@ -270,6 +396,14 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
     }
 
     gain_scaling := envelope_level * voice.velocity * voice.configuration.gain;
+    if volume_modulation != 0.0 {
+        volume_factor := 1.0 + volume_modulation;
+        if volume_factor < 0.0 {
+            volume_factor = 0.0;
+        }
+        gain_scaling *= volume_factor;
+    }
+
     left_output := left_filtered * gain_scaling;
     right_output := right_filtered * gain_scaling;
 
@@ -468,6 +602,66 @@ process_biquad_filter :: (coefficients: Biquad_Coefficients, input_sample: float
     return output_sample;
 }
 
+calculate_lfo_frequency_hertz :: (configuration: LFO_Configuration, beats_per_minute: float) -> float {
+    if !configuration.is_tempo_synced {
+        return configuration.rate_hertz;
+    }
+
+    effective_beats_per_minute := beats_per_minute;
+    if effective_beats_per_minute <= 0.0 {
+        effective_beats_per_minute = 120.0;
+    }
+
+    numerator := cast(float64) configuration.tempo_sync_numerator;
+    denominator := cast(float64) configuration.tempo_sync_denominator;
+    if denominator <= 0.0 {
+        denominator = 4.0;
+    }
+
+    if numerator <= 0.0 {
+        numerator = 1.0;
+    }
+
+    triplet_multiplier := ifx configuration.is_triplet then (2.0 / 3.0) else 1.0;
+    note_duration_in_beats := (numerator / denominator) * 4.0 * triplet_multiplier;
+    if note_duration_in_beats <= 0.0001 {
+        note_duration_in_beats = 1.0;
+    }
+
+    seconds_per_beat := 60.0 / cast(float64) effective_beats_per_minute;
+    period_in_seconds := note_duration_in_beats * seconds_per_beat;
+    if period_in_seconds <= 0.000001 {
+        period_in_seconds = 1.0;
+    }
+
+    frequency_hertz := cast(float) (1.0 / period_in_seconds);
+
+    return frequency_hertz;
+}
+
+generate_lfo_sample :: (waveform: LFO_Waveform, phase: float64, random_value: float) -> float {
+    if waveform == {
+        case .SINE;
+            return cast(float) sin(phase * 2.0 * PI);
+
+        case .TRIANGLE;
+            naive_sample := ifx phase < 0.5 then cast(float) (4.0 * phase - 1.0) else cast(float) (3.0 - 4.0 * phase);
+
+            return naive_sample;
+
+        case .SQUARE;
+            sample_value := ifx phase < 0.5 then 1.0 else -1.0;
+
+            return sample_value;
+
+        case .SAMPLE_AND_HOLD;
+            return random_value;
+
+        case;
+            return 0.0;
+    }
+}
+
 MAXIMUM_UNISON_VOICES :: 8;
 
 Biquad_Coefficients :: struct {
@@ -489,6 +683,13 @@ Synthesizer_Voice :: struct {
     velocity: float = 1.0;
     amplitude_envelope: Envelope_Generator;
     filter_envelope: Envelope_Generator;
+    lfo_1_phase: float64 = 0.0;
+    lfo_2_phase: float64 = 0.0;
+    lfo_1_random_value: float = 0.0;
+    lfo_2_random_value: float = 0.0;
+    lfo_1_noise_seed: u32 = 4321987;
+    lfo_2_noise_seed: u32 = 9876543;
+    beats_per_minute: float = 120.0;
     filter_state_1: float = 0.0;
     filter_state_2: float = 0.0;
     filter_right_state_1: float = 0.0;

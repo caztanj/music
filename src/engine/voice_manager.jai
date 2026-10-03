@@ -1,5 +1,6 @@
-initialize_voice_manager :: (voice_manager: *Voice_Manager, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+initialize_voice_manager :: (voice_manager: *Voice_Manager, sample_rate: s64 = DEFAULT_SAMPLE_RATE, beats_per_minute: float = 120.0) {
     voice_manager.sample_rate = sample_rate;
+    voice_manager.beats_per_minute = beats_per_minute;
     voice_manager.total_rendered_samples = 0;
 
     voice_index := 0;
@@ -19,7 +20,7 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
     slot.velocity = velocity;
     slot.age_samples = 0;
 
-    initialize_synthesizer_voice(*slot.synthesizer_voice, configuration, voice_manager.sample_rate);
+    initialize_synthesizer_voice(*slot.synthesizer_voice, configuration, voice_manager.sample_rate, voice_manager.beats_per_minute);
     trigger_synthesizer_note_on(*slot.synthesizer_voice, midi_note_number, velocity);
 
     return slot;
@@ -281,5 +282,6 @@ Voice_Slot :: struct {
 Voice_Manager :: struct {
     voices: [MAXIMUM_VOICES] Voice_Slot;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+    beats_per_minute: float = 120.0;
     total_rendered_samples: u64 = 0;
 }

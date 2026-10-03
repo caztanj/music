@@ -458,6 +458,85 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
             gain_value, gain_success := parse_number(parser);
             if !gain_success return false;
             synthesizer_configuration.gain = cast(float) gain_value;
+        } else if parameter_name == "lfo1_waveform" || parameter_name == "lfo1_wave" || parameter_name == "lfo_waveform" || parameter_name == "lfo_wave" || parameter_name == "lfo2_waveform" || parameter_name == "lfo2_wave" {
+            target_lfo := ifx (parameter_name == "lfo2_waveform" || parameter_name == "lfo2_wave") then *synthesizer_configuration.lfo_2 else *synthesizer_configuration.lfo_1;
+            waveform_token := current_token(parser);
+            waveform_name := ifx waveform_token.type == .STRING then waveform_token.string_value else waveform_token.text;
+            lfo_waveform, waveform_success := string_to_lfo_waveform(waveform_name);
+            if !waveform_success {
+                set_error(parser, waveform_token.location, sprint("Unknown LFO waveform '%'", waveform_name));
+                return false;
+            }
+            target_lfo.waveform = lfo_waveform;
+            target_lfo.enabled = true;
+            advance_token(parser);
+        } else if parameter_name == "lfo1_destination" || parameter_name == "lfo1_dest" || parameter_name == "lfo1_target" || parameter_name == "lfo_destination" || parameter_name == "lfo_dest" || parameter_name == "lfo_target" || parameter_name == "lfo2_destination" || parameter_name == "lfo2_dest" || parameter_name == "lfo2_target" {
+            target_lfo := ifx (parameter_name == "lfo2_destination" || parameter_name == "lfo2_dest" || parameter_name == "lfo2_target") then *synthesizer_configuration.lfo_2 else *synthesizer_configuration.lfo_1;
+            destination_token := current_token(parser);
+            destination_name := ifx destination_token.type == .STRING then destination_token.string_value else destination_token.text;
+            lfo_destination, destination_success := string_to_lfo_destination(destination_name);
+            if !destination_success {
+                set_error(parser, destination_token.location, sprint("Unknown LFO destination '%'", destination_name));
+                return false;
+            }
+            target_lfo.destination = lfo_destination;
+            target_lfo.enabled = true;
+            advance_token(parser);
+        } else if parameter_name == "lfo1_rate" || parameter_name == "lfo1_speed" || parameter_name == "lfo_rate" || parameter_name == "lfo_speed" || parameter_name == "lfo2_rate" || parameter_name == "lfo2_speed" || parameter_name == "lfo1_sync" || parameter_name == "lfo_sync" || parameter_name == "lfo2_sync" {
+            target_lfo := ifx (parameter_name == "lfo2_rate" || parameter_name == "lfo2_speed" || parameter_name == "lfo2_sync") then *synthesizer_configuration.lfo_2 else *synthesizer_configuration.lfo_1;
+            rate_token := current_token(parser);
+            if rate_token.type == .STRING {
+                sync_success, numerator, denominator, is_triplet := parse_tempo_sync_string(rate_token.string_value);
+                if sync_success {
+                    target_lfo.is_tempo_synced = true;
+                    target_lfo.tempo_sync_numerator = numerator;
+                    target_lfo.tempo_sync_denominator = denominator;
+                    target_lfo.is_triplet = is_triplet;
+                    target_lfo.enabled = true;
+                } else {
+                    set_error(parser, rate_token.location, sprint("Invalid tempo sync format '%', expected e.g. '1/4' or '1/8t'", rate_token.string_value));
+                    return false;
+                }
+                advance_token(parser);
+            } else if rate_token.type == .INTEGER || rate_token.type == .FLOAT {
+                rate_value, rate_success := parse_number(parser);
+                if !rate_success return false;
+                target_lfo.rate_hertz = cast(float) rate_value;
+                target_lfo.is_tempo_synced = false;
+                target_lfo.enabled = true;
+            } else if rate_token.type == .IDENTIFIER {
+                sync_success, numerator, denominator, is_triplet := parse_tempo_sync_string(rate_token.text);
+                if sync_success {
+                    target_lfo.is_tempo_synced = true;
+                    target_lfo.tempo_sync_numerator = numerator;
+                    target_lfo.tempo_sync_denominator = denominator;
+                    target_lfo.is_triplet = is_triplet;
+                    target_lfo.enabled = true;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, rate_token.location, sprint("Invalid tempo sync format '%'", rate_token.text));
+                    return false;
+                }
+            } else {
+                set_error(parser, rate_token.location, "Expected number or sync string for LFO rate");
+                return false;
+            }
+        } else if parameter_name == "lfo1_amount" || parameter_name == "lfo1_depth" || parameter_name == "lfo_amount" || parameter_name == "lfo_depth" || parameter_name == "lfo2_amount" || parameter_name == "lfo2_depth" {
+            target_lfo := ifx (parameter_name == "lfo2_amount" || parameter_name == "lfo2_depth") then *synthesizer_configuration.lfo_2 else *synthesizer_configuration.lfo_1;
+            amount_value, amount_success := parse_number(parser);
+            if !amount_success return false;
+            target_lfo.amount = cast(float) amount_value;
+            target_lfo.enabled = true;
+        } else if parameter_name == "lfo1_retrigger" || parameter_name == "lfo_retrigger" || parameter_name == "lfo2_retrigger" {
+            target_lfo := ifx parameter_name == "lfo2_retrigger" then *synthesizer_configuration.lfo_2 else *synthesizer_configuration.lfo_1;
+            retrigger_token := current_token(parser);
+            retrigger_text := ifx retrigger_token.type == .STRING then retrigger_token.string_value else retrigger_token.text;
+            if retrigger_text == "on" || retrigger_text == "true" {
+                target_lfo.retrigger = true;
+            } else if retrigger_text == "off" || retrigger_text == "false" {
+                target_lfo.retrigger = false;
+            }
+            advance_token(parser);
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown synthesizer parameter '%'", parameter_name));
             return false;
@@ -1035,6 +1114,53 @@ skip_newlines :: (parser: *Parser) {
             break;
         }
     }
+}
+
+parse_tempo_sync_string :: (sync_string: string) -> bool, s32, s32, bool {
+    if sync_string.count == 0 {
+        return false, 1, 4, false;
+    }
+
+    is_triplet := false;
+    string_to_parse := sync_string;
+
+    last_character := string_to_parse[string_to_parse.count - 1];
+    if last_character == #char "t" || last_character == #char "T" {
+        is_triplet = true;
+        string_to_parse.count -= 1;
+    }
+
+    slash_index := -1;
+    cursor := 0;
+    while cursor < string_to_parse.count {
+        if string_to_parse[cursor] == #char "/" {
+            slash_index = cursor;
+            break;
+        }
+
+        cursor += 1;
+    }
+
+    if slash_index < 0 {
+        return false, 1, 4, false;
+    }
+
+    numerator_string: string;
+    numerator_string.data = string_to_parse.data;
+    numerator_string.count = slash_index;
+
+    denominator_string: string;
+    denominator_string.data = string_to_parse.data + slash_index + 1;
+    denominator_string.count = string_to_parse.count - slash_index - 1;
+
+    numerator, numerator_success := string_to_int(numerator_string);
+    denominator, denominator_success := string_to_int(denominator_string);
+
+    if !numerator_success || !denominator_success || denominator <= 0 || numerator <= 0 {
+        return false, 1, 4, false;
+    }
+
+    return true, cast(s32) numerator, cast(s32) denominator, is_triplet;
 }
 
 set_error :: (parser: *Parser, location: Source_Location, message: string) {

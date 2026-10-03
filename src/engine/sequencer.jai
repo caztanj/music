@@ -404,6 +404,7 @@ dispatch_sequencer_event :: (event: *Sequencer_Event, song_specification: *Song_
 }
 
 render_sequencer_block :: (sequencer: *Sequencer, song_specification: *Song_Specification, voice_manager: *Voice_Manager, mixer: *Mixer, output_buffer: [] float, frame_count: s64) {
+    voice_manager.beats_per_minute = song_specification.project.beats_per_minute;
     clear_channel_buffers(mixer, frame_count);
     collect_sequencer_events_for_block(sequencer, song_specification, frame_count);
 
