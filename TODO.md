@@ -194,10 +194,10 @@
 
 - [x] **9.1 Sample Kit (`samples/`)**
   - [x] Bundle standard clean 44.1 kHz WAV samples: `kick.wav`, `snare.wav`, `hihat.wav`, `clap.wav`.
-- [ ] **9.2 Demo Song Files (`songs/`)**
-  - [ ] `songs/drums.song`: 4-bar drum loop demonstrating step sequencer grids.
-  - [ ] `songs/synth_lead.song`: Melodic piano-roll notation with synth filter envelope and delay.
-  - [ ] `songs/full_demo.song`: Multi-instrument track with intro, drop, and complete arrangement.
+- [x] **9.2 Demo Song Files (`songs/`)**
+  - [x] `songs/drums.song`: 4-bar drum loop demonstrating step sequencer grids.
+  - [x] `songs/synth_lead.song`: Melodic piano-roll notation with synth filter envelope and delay.
+  - [x] `songs/full_demo.song`: Multi-instrument track with intro, drop, and complete arrangement.
 - [ ] **9.3 End-to-End Validation**
   - [ ] Verify offline export generates byte-identical audio outputs given identical inputs.
   - [ ] Verify real-time playback matches exported WAV file exactly.

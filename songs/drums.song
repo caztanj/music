@@ -1,0 +1,30 @@
+[project]
+name = "Classic Beats"
+bpm = 128
+time_signature = 4/4
+bars = 4
+
+[instruments]
+kick = sampler("samples/kick.wav", gain = 1.0)
+snare = sampler("samples/snare.wav", gain = 0.85)
+hihat = sampler("samples/hihat.wav", gain = 0.70)
+clap = sampler("samples/clap.wav", gain = 0.75)
+
+[pattern beat_groove]
+kick  | x . . . x . . . x . . . x . . . |
+snare | . . . . x . . . . . . . x . . . |
+hihat | x . x . x . x . x . x . x . x . |
+clap  | . . . . . . . . . . . . x . . . |
+
+[mixer]
+track 1 (drums): gain = 0.95, pan = 0.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+snare -> track 1
+hihat -> track 1
+clap -> track 1
+
+[arrangement]
+bar 1-4: beat_groove

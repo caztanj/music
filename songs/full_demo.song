@@ -1,0 +1,53 @@
+[project]
+name = "Cyber Horizon"
+bpm = 124
+time_signature = 4/4
+bars = 16
+
+[instruments]
+kick = sampler("samples/kick.wav", gain = 1.0)
+snare = sampler("samples/snare.wav", gain = 0.85)
+hihat = sampler("samples/hihat.wav", gain = 0.70)
+clap = sampler("samples/clap.wav", gain = 0.75)
+bass = synth(wave="saw", filter="lowpass", cutoff=650, res=0.2, attack=5, decay=60, sustain=0.5, release=80, gain=0.9)
+lead = synth(wave="square", filter="lowpass", cutoff=1800, res=0.35, attack=10, decay=100, sustain=0.5, release=180, gain=0.8)
+
+[pattern drum_beat]
+kick  | x . . . x . . . x . . . x . . . |
+snare | . . . . x . . . . . . . x . . . |
+hihat | x . x . x . x . x . x . x . x . |
+clap  | . . . . . . . . . . . . x . . . |
+
+[pattern bass_riff]
+C2 step=0 len=2 vel=0.9
+C2 step=3 len=1 vel=0.8
+Eb2 step=6 len=2 vel=0.85
+F2 step=10 len=2 vel=0.85
+G2 step=14 len=2 vel=0.95
+
+[pattern lead_hook]
+C4 step=0 len=2 vel=0.85
+G4 step=4 len=2 vel=0.8
+Bb4 step=8 len=4 vel=0.9
+C5 step=12 len=4 vel=1.0
+
+[mixer]
+track 1 (drums): gain = 0.95, pan = 0.0, output = master
+track 2 (bass): gain = 0.90, pan = 0.0, output = master
+track 3 (lead): gain = 0.80, pan = 0.15, delay = 0.24, feedback = 0.35, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+snare -> track 1
+hihat -> track 1
+clap -> track 1
+bass -> track 2
+lead -> track 3
+
+[arrangement]
+bar 1-8: drum_beat
+bar 1-8: bass_riff
+bar 5-16: lead_hook
+bar 9-16: drum_beat
+bar 9-16: bass_riff
