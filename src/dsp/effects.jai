@@ -875,6 +875,159 @@ process_saturation_insert :: (saturation: *Saturation_Insert, input_left: float,
     return output_left, output_right;
 }
 
+initialize_dynamic_compressor :: (compressor: *Dynamic_Compressor, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+    compressor.sample_rate = sample_rate;
+    compressor.enabled = false;
+    compressor.threshold_decibels = -12.0;
+    compressor.ratio = 4.0;
+    compressor.attack_milliseconds = 10.0;
+    compressor.release_milliseconds = 100.0;
+    compressor.knee_decibels = 6.0;
+    compressor.makeup_gain_decibels = 0.0;
+    compressor.mix = 1.0;
+    compressor.envelope_decibels = 0.0;
+
+    calculate_compressor_coefficients(compressor);
+}
+
+configure_dynamic_compressor :: (
+    compressor: *Dynamic_Compressor,
+    threshold_decibels: float = -12.0,
+    ratio: float = 4.0,
+    attack_milliseconds: float = 10.0,
+    release_milliseconds: float = 100.0,
+    knee_decibels: float = 6.0,
+    makeup_gain_decibels: float = 0.0,
+    mix: float = 1.0
+) {
+    compressor.threshold_decibels = threshold_decibels;
+    if compressor.threshold_decibels < -60.0 {
+        compressor.threshold_decibels = -60.0;
+    } else if compressor.threshold_decibels > 0.0 {
+        compressor.threshold_decibels = 0.0;
+    }
+
+    compressor.ratio = ratio;
+    if compressor.ratio < 1.0 {
+        compressor.ratio = 1.0;
+    } else if compressor.ratio > 100.0 {
+        compressor.ratio = 100.0;
+    }
+
+    compressor.attack_milliseconds = attack_milliseconds;
+    if compressor.attack_milliseconds < 0.1 {
+        compressor.attack_milliseconds = 0.1;
+    } else if compressor.attack_milliseconds > 200.0 {
+        compressor.attack_milliseconds = 200.0;
+    }
+
+    compressor.release_milliseconds = release_milliseconds;
+    if compressor.release_milliseconds < 5.0 {
+        compressor.release_milliseconds = 5.0;
+    } else if compressor.release_milliseconds > 2000.0 {
+        compressor.release_milliseconds = 2000.0;
+    }
+
+    compressor.knee_decibels = knee_decibels;
+    if compressor.knee_decibels < 0.0 {
+        compressor.knee_decibels = 0.0;
+    } else if compressor.knee_decibels > 24.0 {
+        compressor.knee_decibels = 24.0;
+    }
+
+    compressor.makeup_gain_decibels = makeup_gain_decibels;
+    if compressor.makeup_gain_decibels < -12.0 {
+        compressor.makeup_gain_decibels = -12.0;
+    } else if compressor.makeup_gain_decibels > 36.0 {
+        compressor.makeup_gain_decibels = 36.0;
+    }
+
+    compressor.mix = mix;
+    if compressor.mix < 0.0 {
+        compressor.mix = 0.0;
+    } else if compressor.mix > 1.0 {
+        compressor.mix = 1.0;
+    }
+
+    compressor.enabled = (compressor.ratio > 1.0 || compressor.makeup_gain_decibels != 0.0) && (compressor.mix > 0.0);
+
+    calculate_compressor_coefficients(compressor);
+}
+
+calculate_compressor_coefficients :: (compressor: *Dynamic_Compressor) {
+    attack_seconds := cast(float64) compressor.attack_milliseconds * 0.001;
+    if attack_seconds < 0.0001 {
+        attack_seconds = 0.0001;
+    }
+
+    release_seconds := cast(float64) compressor.release_milliseconds * 0.001;
+    if release_seconds < 0.001 {
+        release_seconds = 0.001;
+    }
+
+    sample_rate_float := cast(float64) compressor.sample_rate;
+    compressor.attack_coefficient = cast(float) exp(-1.0 / (attack_seconds * sample_rate_float));
+    compressor.release_coefficient = cast(float) exp(-1.0 / (release_seconds * sample_rate_float));
+}
+
+reset_dynamic_compressor :: (compressor: *Dynamic_Compressor) {
+    compressor.envelope_decibels = 0.0;
+}
+
+process_dynamic_compressor :: (
+    compressor: *Dynamic_Compressor,
+    input_left: float,
+    input_right: float,
+    sidechain_left: float = 0.0,
+    sidechain_right: float = 0.0,
+    use_sidechain: bool = false
+) -> float, float {
+    if !compressor.enabled {
+        return input_left, input_right;
+    }
+
+    detection_left := ifx use_sidechain then sidechain_left else input_left;
+    detection_right := ifx use_sidechain then sidechain_right else input_right;
+
+    peak_amplitude := abs(detection_left);
+    right_amplitude := abs(detection_right);
+    if right_amplitude > peak_amplitude {
+        peak_amplitude = right_amplitude;
+    }
+
+    detection_decibels := linear_to_decibels(peak_amplitude);
+    overshoot := detection_decibels - compressor.threshold_decibels;
+    half_knee := compressor.knee_decibels * 0.5;
+
+    target_gain_reduction_decibels: float = 0.0;
+
+    if compressor.ratio > 1.0 {
+        inverse_ratio := 1.0 / compressor.ratio;
+        slope_factor := inverse_ratio - 1.0;
+
+        if compressor.knee_decibels > 0.0 && overshoot > -half_knee && overshoot < half_knee {
+            normalized_knee := overshoot + half_knee;
+            target_gain_reduction_decibels = slope_factor * (normalized_knee * normalized_knee) / (2.0 * compressor.knee_decibels);
+        } else if overshoot >= half_knee {
+            target_gain_reduction_decibels = slope_factor * overshoot;
+        }
+    }
+
+    coefficient := ifx target_gain_reduction_decibels < compressor.envelope_decibels then compressor.attack_coefficient else compressor.release_coefficient;
+    compressor.envelope_decibels = coefficient * compressor.envelope_decibels + (1.0 - coefficient) * target_gain_reduction_decibels;
+
+    total_gain_decibels := compressor.envelope_decibels + compressor.makeup_gain_decibels;
+    linear_gain := decibels_to_linear(total_gain_decibels);
+
+    compressed_left := input_left * linear_gain;
+    compressed_right := input_right * linear_gain;
+
+    output_left := input_left * (1.0 - compressor.mix) + compressed_left * compressor.mix;
+    output_right := input_right * (1.0 - compressor.mix) + compressed_right * compressor.mix;
+
+    return output_left, output_right;
+}
+
 MAXIMUM_DELAY_FRAMES :: 96000;
 MAXIMUM_PREDELAY_FRAMES :: 24000;
 REVERB_COMB_COUNT :: 8;
@@ -992,5 +1145,21 @@ Saturation_Insert :: struct {
     mix: float = 1.0;
     output_gain: float = 1.0;
 }
+
+Dynamic_Compressor :: struct {
+    enabled: bool = false;
+    threshold_decibels: float = -12.0;
+    ratio: float = 4.0;
+    attack_milliseconds: float = 10.0;
+    release_milliseconds: float = 100.0;
+    knee_decibels: float = 6.0;
+    makeup_gain_decibels: float = 0.0;
+    mix: float = 1.0;
+    envelope_decibels: float = 0.0;
+    attack_coefficient: float = 0.0;
+    release_coefficient: float = 0.0;
+    sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+}
+
 
 

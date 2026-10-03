@@ -936,6 +936,60 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if !gain_success return false;
             track.saturation_output_gain = cast(float) gain_value;
             track.saturation_enabled = true;
+        } else if parameter_name == "compressor" || parameter_name == "comp" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER {
+                if type_token.text == "on" || type_token.text == "true" {
+                    track.compressor_enabled = true;
+                    advance_token(parser);
+                } else if type_token.text == "off" || type_token.text == "false" {
+                    track.compressor_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Expected 'on', 'off', 'true', or 'false' for compressor, got '%'", type_token.text));
+                    return false;
+                }
+            } else {
+                threshold_value, threshold_success := parse_number(parser);
+                if !threshold_success return false;
+                track.compressor_threshold_decibels = cast(float) threshold_value;
+                track.compressor_enabled = true;
+            }
+        } else if parameter_name == "comp_threshold" || parameter_name == "compressor_threshold" || parameter_name == "threshold" {
+            threshold_value, threshold_success := parse_number(parser);
+            if !threshold_success return false;
+            track.compressor_threshold_decibels = cast(float) threshold_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_ratio" || parameter_name == "compressor_ratio" || parameter_name == "ratio" {
+            ratio_value, ratio_success := parse_number(parser);
+            if !ratio_success return false;
+            track.compressor_ratio = cast(float) ratio_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_attack" || parameter_name == "compressor_attack" || parameter_name == "attack" {
+            attack_value, attack_success := parse_number(parser);
+            if !attack_success return false;
+            track.compressor_attack_milliseconds = cast(float) attack_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_release" || parameter_name == "compressor_release" || parameter_name == "release" {
+            release_value, release_success := parse_number(parser);
+            if !release_success return false;
+            track.compressor_release_milliseconds = cast(float) release_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_knee" || parameter_name == "compressor_knee" || parameter_name == "knee" {
+            knee_value, knee_success := parse_number(parser);
+            if !knee_success return false;
+            track.compressor_knee_decibels = cast(float) knee_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_gain" || parameter_name == "comp_makeup" || parameter_name == "compressor_gain" || parameter_name == "compressor_makeup" || parameter_name == "makeup_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            track.compressor_makeup_gain_decibels = cast(float) gain_value;
+            track.compressor_enabled = true;
+        } else if parameter_name == "comp_mix" || parameter_name == "compressor_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            track.compressor_mix = cast(float) mix_value;
+            track.compressor_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -1138,6 +1192,60 @@ parse_master_track_parameters :: (parser: *Parser, master_track: *Master_Track_D
             if !gain_success return false;
             master_track.saturation_output_gain = cast(float) gain_value;
             master_track.saturation_enabled = true;
+        } else if parameter_name == "compressor" || parameter_name == "comp" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER {
+                if type_token.text == "on" || type_token.text == "true" {
+                    master_track.compressor_enabled = true;
+                    advance_token(parser);
+                } else if type_token.text == "off" || type_token.text == "false" {
+                    master_track.compressor_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Expected 'on', 'off', 'true', or 'false' for compressor, got '%'", type_token.text));
+                    return false;
+                }
+            } else {
+                threshold_value, threshold_success := parse_number(parser);
+                if !threshold_success return false;
+                master_track.compressor_threshold_decibels = cast(float) threshold_value;
+                master_track.compressor_enabled = true;
+            }
+        } else if parameter_name == "comp_threshold" || parameter_name == "compressor_threshold" || parameter_name == "threshold" {
+            threshold_value, threshold_success := parse_number(parser);
+            if !threshold_success return false;
+            master_track.compressor_threshold_decibels = cast(float) threshold_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_ratio" || parameter_name == "compressor_ratio" || parameter_name == "ratio" {
+            ratio_value, ratio_success := parse_number(parser);
+            if !ratio_success return false;
+            master_track.compressor_ratio = cast(float) ratio_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_attack" || parameter_name == "compressor_attack" || parameter_name == "attack" {
+            attack_value, attack_success := parse_number(parser);
+            if !attack_success return false;
+            master_track.compressor_attack_milliseconds = cast(float) attack_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_release" || parameter_name == "compressor_release" || parameter_name == "release" {
+            release_value, release_success := parse_number(parser);
+            if !release_success return false;
+            master_track.compressor_release_milliseconds = cast(float) release_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_knee" || parameter_name == "compressor_knee" || parameter_name == "knee" {
+            knee_value, knee_success := parse_number(parser);
+            if !knee_success return false;
+            master_track.compressor_knee_decibels = cast(float) knee_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_gain" || parameter_name == "comp_makeup" || parameter_name == "compressor_gain" || parameter_name == "compressor_makeup" || parameter_name == "makeup_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            master_track.compressor_makeup_gain_decibels = cast(float) gain_value;
+            master_track.compressor_enabled = true;
+        } else if parameter_name == "comp_mix" || parameter_name == "compressor_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            master_track.compressor_mix = cast(float) mix_value;
+            master_track.compressor_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown master parameter '%'", parameter_name));
             return false;

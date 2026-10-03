@@ -4,7 +4,7 @@
 |---|---|---|:---:|
 | **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
 | **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟢 Completed |
-| **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | ⬜ Planned |
+| **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | 🟡 In Progress |
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
 | **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | ⬜ Planned |
 | **Phase 15** | Automation & Modulation Curves | Timeline Parameter Automation (Sweeps, Risers, Fades) | ⬜ Planned |
@@ -62,9 +62,9 @@
 
 > **Goal**: Professional mix balance, glue, headroom control, and modern dance-floor sidechain pumping.
 
-- [ ] **12.1 Dynamic Peak/RMS Compressor (`src/engine/mixer.jai`, `src/dsp/effects.jai`)**
-  - [ ] Threshold (-60 to 0 dB), Ratio (1:1 to 20:1 / $\infty$), Attack time (0.1–100 ms), Release time (10–1000 ms).
-  - [ ] Soft-knee transition curve and automated or manual makeup gain.
+- [x] **12.1 Dynamic Peak/RMS Compressor (`src/engine/mixer.jai`, `src/dsp/effects.jai`)**
+  - [x] Threshold (-60 to 0 dB), Ratio (1:1 to 20:1 / $\infty$), Attack time (0.1–100 ms), Release time (10–1000 ms).
+  - [x] Soft-knee transition curve and automated or manual makeup gain.
 - [ ] **12.2 Sidechain Ducking Engine**
   - [ ] Allow any mixer track to receive sidechain detection signals from another track (e.g. Kick $\to$ Bass, Kick $\to$ Pads).
   - [ ] Instant envelope follower with adjustable ducking depth and release timing for rhythmic pumping.

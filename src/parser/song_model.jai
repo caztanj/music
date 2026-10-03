@@ -443,6 +443,14 @@ Mixer_Track_Definition :: struct {
     saturation_drive: float = 1.0;
     saturation_mix: float = 1.0;
     saturation_output_gain: float = 1.0;
+    compressor_enabled: bool = false;
+    compressor_threshold_decibels: float = -12.0;
+    compressor_ratio: float = 4.0;
+    compressor_attack_milliseconds: float = 10.0;
+    compressor_release_milliseconds: float = 100.0;
+    compressor_knee_decibels: float = 6.0;
+    compressor_makeup_gain_decibels: float = 0.0;
+    compressor_mix: float = 1.0;
     output_target: string = "master";
     location: Source_Location;
 }
@@ -476,6 +484,14 @@ Master_Track_Definition :: struct {
     saturation_drive: float = 1.0;
     saturation_mix: float = 1.0;
     saturation_output_gain: float = 1.0;
+    compressor_enabled: bool = false;
+    compressor_threshold_decibels: float = -12.0;
+    compressor_ratio: float = 4.0;
+    compressor_attack_milliseconds: float = 10.0;
+    compressor_release_milliseconds: float = 100.0;
+    compressor_knee_decibels: float = 6.0;
+    compressor_makeup_gain_decibels: float = 0.0;
+    compressor_mix: float = 1.0;
     location: Source_Location;
 }
 

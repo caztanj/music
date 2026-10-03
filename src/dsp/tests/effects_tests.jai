@@ -474,4 +474,117 @@ effects_tests :: () {
         expect_true(mixer.master.saturation.saturation_type == .TANH);
         expect_near(mixer.master.saturation.drive, 1.5, 0.001);
     });
+
+    test("compressor_gain_reduction_above_threshold", () {
+        compressor: Dynamic_Compressor;
+        initialize_dynamic_compressor(*compressor, 44100);
+        configure_dynamic_compressor(*compressor, threshold_decibels = -10.0, ratio = 4.0, attack_milliseconds = 1.0, release_milliseconds = 50.0, knee_decibels = 0.0, makeup_gain_decibels = 0.0, mix = 1.0);
+
+        sample_index := 0;
+        final_left: float = 0.0;
+        final_right: float = 0.0;
+
+        while sample_index < 1000 {
+            final_left, final_right = process_dynamic_compressor(*compressor, 1.0, 1.0);
+            sample_index += 1;
+        }
+
+        expect_near(final_left, 0.4217, 0.015);
+        expect_near(final_right, 0.4217, 0.015);
+        expect_near(compressor.envelope_decibels, -7.5, 0.25);
+
+        release_index := 0;
+        while release_index < 10000 {
+            process_dynamic_compressor(*compressor, 0.0, 0.0);
+            release_index += 1;
+        }
+
+        expect_true(compressor.envelope_decibels > -0.5);
+    });
+
+    test("compressor_soft_knee_smooth_transition", () {
+        compressor: Dynamic_Compressor;
+        initialize_dynamic_compressor(*compressor, 44100);
+        configure_dynamic_compressor(*compressor, threshold_decibels = -10.0, ratio = 4.0, attack_milliseconds = 0.1, release_milliseconds = 100.0, knee_decibels = 6.0, makeup_gain_decibels = 0.0, mix = 1.0);
+
+        sub_knee_amplitude := decibels_to_linear(-14.0);
+        sample_index := 0;
+        while sample_index < 100 {
+            process_dynamic_compressor(*compressor, sub_knee_amplitude, sub_knee_amplitude);
+            sample_index += 1;
+        }
+        expect_near(compressor.envelope_decibels, 0.0, 0.01);
+
+        mid_knee_amplitude := decibels_to_linear(-10.0);
+        sample_index = 0;
+        while sample_index < 500 {
+            process_dynamic_compressor(*compressor, mid_knee_amplitude, mid_knee_amplitude);
+            sample_index += 1;
+        }
+        expect_true(compressor.envelope_decibels < -0.5);
+        expect_true(compressor.envelope_decibels > -3.0);
+    });
+
+    test("compressor_makeup_gain_and_parallel_mix", () {
+        compressor: Dynamic_Compressor;
+        initialize_dynamic_compressor(*compressor, 44100);
+        configure_dynamic_compressor(*compressor, threshold_decibels = -10.0, ratio = 4.0, makeup_gain_decibels = 6.0206, mix = 1.0);
+
+        small_sample: float = 0.01;
+        output_left, output_right := process_dynamic_compressor(*compressor, small_sample, small_sample);
+        expect_near(output_left, 0.02, 0.001);
+        expect_near(output_right, 0.02, 0.001);
+
+        configure_dynamic_compressor(*compressor, threshold_decibels = -20.0, ratio = 100.0, attack_milliseconds = 0.1, makeup_gain_decibels = 0.0, mix = 0.5);
+        sample_index := 0;
+        blended_left: float = 0.0;
+        while sample_index < 500 {
+            blended_left, _ = process_dynamic_compressor(*compressor, 1.0, 1.0);
+            sample_index += 1;
+        }
+        expect_true(blended_left > 0.5);
+        expect_true(blended_left < 0.6);
+    });
+
+    test("mixer_parser_compressor_arguments", () {
+        song_text := "[project]\nname = \"Compressor Mixer Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\")\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 0.9, comp = on, comp_threshold = -15.5, comp_ratio = 3.5, comp_attack = 5.0, comp_release = 80.0, comp_knee = 4.0, comp_gain = 3.0, comp_mix = 0.8, output = master\nmaster: gain = 1.0, compressor = -8.0, ratio = 2.5, attack = 20.0, release = 150.0, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        track := *specification.mixer.tracks[0];
+        expect_true(track.compressor_enabled);
+        expect_near(track.compressor_threshold_decibels, -15.5, 0.001);
+        expect_near(track.compressor_ratio, 3.5, 0.001);
+        expect_near(track.compressor_attack_milliseconds, 5.0, 0.001);
+        expect_near(track.compressor_release_milliseconds, 80.0, 0.001);
+        expect_near(track.compressor_knee_decibels, 4.0, 0.001);
+        expect_near(track.compressor_makeup_gain_decibels, 3.0, 0.001);
+        expect_near(track.compressor_mix, 0.8, 0.001);
+
+        expect_true(specification.mixer.master.compressor_enabled);
+        expect_near(specification.mixer.master.compressor_threshold_decibels, -8.0, 0.001);
+        expect_near(specification.mixer.master.compressor_ratio, 2.5, 0.001);
+        expect_near(specification.mixer.master.compressor_attack_milliseconds, 20.0, 0.001);
+        expect_near(specification.mixer.master.compressor_release_milliseconds, 150.0, 0.001);
+
+        mixer: Mixer;
+        configure_mixer_from_definition(*mixer, specification.mixer, 44100, 120.0);
+        defer deinitialize_mixer(*mixer);
+
+        expect_true(mixer.tracks[0].compressor_enabled);
+        expect_near(mixer.tracks[0].compressor.threshold_decibels, -15.5, 0.001);
+        expect_near(mixer.tracks[0].compressor.ratio, 3.5, 0.001);
+        expect_near(mixer.tracks[0].compressor.attack_milliseconds, 5.0, 0.001);
+        expect_near(mixer.tracks[0].compressor.release_milliseconds, 80.0, 0.001);
+        expect_near(mixer.tracks[0].compressor.knee_decibels, 4.0, 0.001);
+        expect_near(mixer.tracks[0].compressor.makeup_gain_decibels, 3.0, 0.001);
+        expect_near(mixer.tracks[0].compressor.mix, 0.8, 0.001);
+
+        expect_true(mixer.master.compressor_enabled);
+        expect_near(mixer.master.compressor.threshold_decibels, -8.0, 0.001);
+        expect_near(mixer.master.compressor.ratio, 2.5, 0.001);
+        expect_near(mixer.master.compressor.attack_milliseconds, 20.0, 0.001);
+        expect_near(mixer.master.compressor.release_milliseconds, 150.0, 0.001);
+    });
 }
