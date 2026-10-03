@@ -189,7 +189,370 @@ process_master_limiter :: (master_limiter: *Master_Limiter, input_left: float, i
     return output_left, output_right;
 }
 
+initialize_studio_reverb :: (reverb: *Studio_Reverb, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+    reverb.sample_rate = sample_rate;
+    reverb.predelay_write_index = 0;
+    reverb.predelay_samples = cast(s64) ((10.0 / 1000.0) * cast(float) sample_rate);
+    reverb.predelay_milliseconds = 10.0;
+    reverb.room_size = 0.5;
+    reverb.decay_time_seconds = 1.5;
+    reverb.damping = 0.5;
+    reverb.stereo_width = 1.0;
+    reverb.wet_level = 0.35;
+    reverb.dry_level = 1.0;
+
+    if reverb.predelay_buffer_left.count == 0 {
+        reverb.predelay_buffer_left = NewArray(MAXIMUM_PREDELAY_FRAMES, float);
+        reverb.predelay_buffer_right = NewArray(MAXIMUM_PREDELAY_FRAMES, float);
+    }
+
+    sample_rate_scale := cast(float64) sample_rate / 44100.0;
+
+    comb_index := 0;
+    while comb_index < REVERB_COMB_COUNT {
+        left_samples := cast(s64) (cast(float64) COMB_TUNING_LEFT[comb_index] * sample_rate_scale);
+        right_samples := cast(s64) (cast(float64) (COMB_TUNING_LEFT[comb_index] + STEREO_SPREAD_OFFSET) * sample_rate_scale);
+
+        left_comb := *reverb.left_comb_filters[comb_index];
+        left_comb.buffer_size = left_samples;
+        left_comb.write_index = 0;
+        left_comb.filter_state = 0.0;
+        if left_comb.buffer.count == 0 {
+            left_comb.buffer = NewArray(left_samples + 16, float);
+        }
+
+        right_comb := *reverb.right_comb_filters[comb_index];
+        right_comb.buffer_size = right_samples;
+        right_comb.write_index = 0;
+        right_comb.filter_state = 0.0;
+        if right_comb.buffer.count == 0 {
+            right_comb.buffer = NewArray(right_samples + 16, float);
+        }
+
+        comb_index += 1;
+    }
+
+    allpass_index := 0;
+    while allpass_index < REVERB_ALLPASS_COUNT {
+        left_samples := cast(s64) (cast(float64) ALLPASS_TUNING_LEFT[allpass_index] * sample_rate_scale);
+        right_samples := cast(s64) (cast(float64) (ALLPASS_TUNING_LEFT[allpass_index] + STEREO_SPREAD_OFFSET) * sample_rate_scale);
+
+        left_allpass := *reverb.left_allpass_filters[allpass_index];
+        left_allpass.buffer_size = left_samples;
+        left_allpass.write_index = 0;
+        left_allpass.feedback = 0.5;
+        if left_allpass.buffer.count == 0 {
+            left_allpass.buffer = NewArray(left_samples + 16, float);
+        }
+
+        right_allpass := *reverb.right_allpass_filters[allpass_index];
+        right_allpass.buffer_size = right_samples;
+        right_allpass.write_index = 0;
+        right_allpass.feedback = 0.5;
+        if right_allpass.buffer.count == 0 {
+            right_allpass.buffer = NewArray(right_samples + 16, float);
+        }
+
+        allpass_index += 1;
+    }
+
+    reset_studio_reverb(reverb);
+}
+
+deinitialize_studio_reverb :: (reverb: *Studio_Reverb) {
+    if reverb.predelay_buffer_left.data != null {
+        array_free(reverb.predelay_buffer_left);
+        reverb.predelay_buffer_left.data = null;
+        reverb.predelay_buffer_left.count = 0;
+    }
+
+    if reverb.predelay_buffer_right.data != null {
+        array_free(reverb.predelay_buffer_right);
+        reverb.predelay_buffer_right.data = null;
+        reverb.predelay_buffer_right.count = 0;
+    }
+
+    comb_index := 0;
+    while comb_index < REVERB_COMB_COUNT {
+        if reverb.left_comb_filters[comb_index].buffer.data != null {
+            array_free(reverb.left_comb_filters[comb_index].buffer);
+            reverb.left_comb_filters[comb_index].buffer.data = null;
+            reverb.left_comb_filters[comb_index].buffer.count = 0;
+        }
+
+        if reverb.right_comb_filters[comb_index].buffer.data != null {
+            array_free(reverb.right_comb_filters[comb_index].buffer);
+            reverb.right_comb_filters[comb_index].buffer.data = null;
+            reverb.right_comb_filters[comb_index].buffer.count = 0;
+        }
+
+        comb_index += 1;
+    }
+
+    allpass_index := 0;
+    while allpass_index < REVERB_ALLPASS_COUNT {
+        if reverb.left_allpass_filters[allpass_index].buffer.data != null {
+            array_free(reverb.left_allpass_filters[allpass_index].buffer);
+            reverb.left_allpass_filters[allpass_index].buffer.data = null;
+            reverb.left_allpass_filters[allpass_index].buffer.count = 0;
+        }
+
+        if reverb.right_allpass_filters[allpass_index].buffer.data != null {
+            array_free(reverb.right_allpass_filters[allpass_index].buffer);
+            reverb.right_allpass_filters[allpass_index].buffer.data = null;
+            reverb.right_allpass_filters[allpass_index].buffer.count = 0;
+        }
+
+        allpass_index += 1;
+    }
+}
+
+reset_studio_reverb :: (reverb: *Studio_Reverb) {
+    reverb.predelay_write_index = 0;
+
+    index := 0;
+    while index < reverb.predelay_buffer_left.count {
+        reverb.predelay_buffer_left[index] = 0.0;
+        reverb.predelay_buffer_right[index] = 0.0;
+        index += 1;
+    }
+
+    comb_index := 0;
+    while comb_index < REVERB_COMB_COUNT {
+        left_comb := *reverb.left_comb_filters[comb_index];
+        left_comb.write_index = 0;
+        left_comb.filter_state = 0.0;
+        sample_index := 0;
+        while sample_index < left_comb.buffer.count {
+            left_comb.buffer[sample_index] = 0.0;
+            sample_index += 1;
+        }
+
+        right_comb := *reverb.right_comb_filters[comb_index];
+        right_comb.write_index = 0;
+        right_comb.filter_state = 0.0;
+        sample_index = 0;
+        while sample_index < right_comb.buffer.count {
+            right_comb.buffer[sample_index] = 0.0;
+            sample_index += 1;
+        }
+
+        comb_index += 1;
+    }
+
+    allpass_index := 0;
+    while allpass_index < REVERB_ALLPASS_COUNT {
+        left_allpass := *reverb.left_allpass_filters[allpass_index];
+        left_allpass.write_index = 0;
+        sample_index := 0;
+        while sample_index < left_allpass.buffer.count {
+            left_allpass.buffer[sample_index] = 0.0;
+            sample_index += 1;
+        }
+
+        right_allpass := *reverb.right_allpass_filters[allpass_index];
+        right_allpass.write_index = 0;
+        sample_index = 0;
+        while sample_index < right_allpass.buffer.count {
+            right_allpass.buffer[sample_index] = 0.0;
+            sample_index += 1;
+        }
+
+        allpass_index += 1;
+    }
+}
+
+configure_studio_reverb :: (
+    reverb: *Studio_Reverb,
+    room_size: float = 0.5,
+    damping: float = 0.5,
+    predelay_milliseconds: float = 10.0,
+    wet_level: float = 0.35,
+    dry_level: float = 1.0,
+    stereo_width: float = 1.0
+) {
+    reverb.room_size = room_size;
+    if reverb.room_size < 0.0 {
+        reverb.room_size = 0.0;
+    } else if reverb.room_size > 1.0 {
+        reverb.room_size = 1.0;
+    }
+
+    reverb.damping = damping;
+    if reverb.damping < 0.0 {
+        reverb.damping = 0.0;
+    } else if reverb.damping > 1.0 {
+        reverb.damping = 1.0;
+    }
+
+    reverb.predelay_milliseconds = predelay_milliseconds;
+    if reverb.predelay_milliseconds < 0.0 {
+        reverb.predelay_milliseconds = 0.0;
+    }
+
+    reverb.predelay_samples = cast(s64) ((reverb.predelay_milliseconds / 1000.0) * cast(float) reverb.sample_rate);
+    if reverb.predelay_samples >= MAXIMUM_PREDELAY_FRAMES {
+        reverb.predelay_samples = MAXIMUM_PREDELAY_FRAMES - 1;
+    }
+
+    reverb.wet_level = wet_level;
+    reverb.dry_level = dry_level;
+    reverb.stereo_width = stereo_width;
+}
+
+process_comb_filter :: (comb_filter: *Comb_Filter, input_sample: float, feedback: float, damping_factor: float) -> float {
+    output_sample := comb_filter.buffer[comb_filter.write_index];
+
+    comb_filter.filter_state = output_sample * (1.0 - damping_factor) + comb_filter.filter_state * damping_factor;
+    if abs(comb_filter.filter_state) < 0.000000000000001 {
+        comb_filter.filter_state = 0.0;
+    }
+
+    new_sample := input_sample + comb_filter.filter_state * feedback;
+    if abs(new_sample) < 0.000000000000001 {
+        new_sample = 0.0;
+    }
+
+    comb_filter.buffer[comb_filter.write_index] = new_sample;
+    comb_filter.write_index = (comb_filter.write_index + 1) % comb_filter.buffer_size;
+
+    return output_sample;
+}
+
+process_allpass_filter :: (allpass_filter: *Allpass_Filter, input_sample: float) -> float {
+    buffered := allpass_filter.buffer[allpass_filter.write_index];
+    output_sample := -input_sample + buffered;
+
+    new_sample := input_sample + buffered * allpass_filter.feedback;
+    if abs(new_sample) < 0.000000000000001 {
+        new_sample = 0.0;
+    }
+
+    allpass_filter.buffer[allpass_filter.write_index] = new_sample;
+    allpass_filter.write_index = (allpass_filter.write_index + 1) % allpass_filter.buffer_size;
+
+    if abs(output_sample) < 0.000000000000001 {
+        output_sample = 0.0;
+    }
+
+    return output_sample;
+}
+
+process_studio_reverb :: (reverb: *Studio_Reverb, input_left: float, input_right: float) -> float, float {
+    if reverb.wet_level <= 0.0 {
+        return input_left * reverb.dry_level, input_right * reverb.dry_level;
+    }
+
+    reverb_input_left := input_left;
+    reverb_input_right := input_right;
+
+    if reverb.predelay_samples > 0 && reverb.predelay_buffer_left.count > 0 {
+        read_index := reverb.predelay_write_index - reverb.predelay_samples;
+        if read_index < 0 {
+            read_index += reverb.predelay_buffer_left.count;
+        }
+
+        reverb_input_left = reverb.predelay_buffer_left[read_index];
+        reverb_input_right = reverb.predelay_buffer_right[read_index];
+
+        reverb.predelay_buffer_left[reverb.predelay_write_index] = input_left;
+        reverb.predelay_buffer_right[reverb.predelay_write_index] = input_right;
+
+        reverb.predelay_write_index = (reverb.predelay_write_index + 1) % reverb.predelay_buffer_left.count;
+    }
+
+    mono_input := (reverb_input_left + reverb_input_right) * 0.015;
+
+    feedback := reverb.room_size * 0.28 + 0.7;
+    if feedback > 0.98 {
+        feedback = 0.98;
+    } else if feedback < 0.0 {
+        feedback = 0.0;
+    }
+
+    damping_factor := reverb.damping * 0.4;
+
+    comb_sum_left: float = 0.0;
+    comb_sum_right: float = 0.0;
+
+    comb_index := 0;
+    while comb_index < REVERB_COMB_COUNT {
+        comb_sum_left += process_comb_filter(*reverb.left_comb_filters[comb_index], mono_input, feedback, damping_factor);
+        comb_sum_right += process_comb_filter(*reverb.right_comb_filters[comb_index], mono_input, feedback, damping_factor);
+        comb_index += 1;
+    }
+
+    diffuse_left := comb_sum_left;
+    diffuse_right := comb_sum_right;
+
+    allpass_index := 0;
+    while allpass_index < REVERB_ALLPASS_COUNT {
+        diffuse_left = process_allpass_filter(*reverb.left_allpass_filters[allpass_index], diffuse_left);
+        diffuse_right = process_allpass_filter(*reverb.right_allpass_filters[allpass_index], diffuse_right);
+        allpass_index += 1;
+    }
+
+    wet_left := diffuse_left * (1.0 + reverb.stereo_width) * 0.5 + diffuse_right * (1.0 - reverb.stereo_width) * 0.5;
+    wet_right := diffuse_right * (1.0 + reverb.stereo_width) * 0.5 + diffuse_left * (1.0 - reverb.stereo_width) * 0.5;
+
+    output_left := input_left * reverb.dry_level + wet_left * reverb.wet_level;
+    output_right := input_right * reverb.dry_level + wet_right * reverb.wet_level;
+
+    if output_left > 2.0 {
+        output_left = 2.0;
+    } else if output_left < -2.0 {
+        output_left = -2.0;
+    }
+
+    if output_right > 2.0 {
+        output_right = 2.0;
+    } else if output_right < -2.0 {
+        output_right = -2.0;
+    }
+
+    return output_left, output_right;
+}
+
 MAXIMUM_DELAY_FRAMES :: 96000;
+MAXIMUM_PREDELAY_FRAMES :: 24000;
+REVERB_COMB_COUNT :: 8;
+REVERB_ALLPASS_COUNT :: 4;
+STEREO_SPREAD_OFFSET :: 23;
+COMB_TUNING_LEFT: [8] s64 : .[1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
+ALLPASS_TUNING_LEFT: [4] s64 : .[556, 441, 341, 225];
+
+Comb_Filter :: struct {
+    buffer: [] float;
+    buffer_size: s64 = 0;
+    write_index: s64 = 0;
+    filter_state: float = 0.0;
+}
+
+Allpass_Filter :: struct {
+    buffer: [] float;
+    buffer_size: s64 = 0;
+    write_index: s64 = 0;
+    feedback: float = 0.5;
+}
+
+Studio_Reverb :: struct {
+    predelay_buffer_left: [] float;
+    predelay_buffer_right: [] float;
+    predelay_write_index: s64 = 0;
+    predelay_samples: s64 = 0;
+    predelay_milliseconds: float = 10.0;
+    left_comb_filters: [REVERB_COMB_COUNT] Comb_Filter;
+    right_comb_filters: [REVERB_COMB_COUNT] Comb_Filter;
+    left_allpass_filters: [REVERB_ALLPASS_COUNT] Allpass_Filter;
+    right_allpass_filters: [REVERB_ALLPASS_COUNT] Allpass_Filter;
+    room_size: float = 0.5;
+    decay_time_seconds: float = 1.5;
+    damping: float = 0.5;
+    stereo_width: float = 1.0;
+    wet_level: float = 0.35;
+    dry_level: float = 1.0;
+    sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+}
 
 Stereo_Delay :: struct {
     left_delay_buffer: [] float;

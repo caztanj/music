@@ -3,7 +3,7 @@
 | Phase | Milestone | Primary Deliverable | Status |
 |---|---|---|:---:|
 | **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
-| **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | ⬜ Planned |
+| **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟡 In Progress |
 | **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | ⬜ Planned |
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
 | **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | ⬜ Planned |
@@ -40,10 +40,10 @@
 
 > **Goal**: Add acoustic depth, spectral balance, and movement to dry instruments so mixes sound deep and polished.
 
-- [ ] **11.1 Algorithmic Studio Reverb (`src/dsp/effects.jai`)**
-  - [ ] Schroeder / Feedback Delay Network (FDN) stereo reverb algorithm.
-  - [ ] Controls: Room Size, Decay Time, High-Frequency Damping, Pre-Delay, and Dry/Wet balance.
-  - [ ] Smooth tail decay without metallic ring or numerical instability.
+- [x] **11.1 Algorithmic Studio Reverb (`src/dsp/effects.jai`)**
+  - [x] Schroeder / Feedback Delay Network (FDN) stereo reverb algorithm.
+  - [x] Controls: Room Size, Decay Time, High-Frequency Damping, Pre-Delay, and Dry/Wet balance.
+  - [x] Smooth tail decay without metallic ring or numerical instability.
 - [ ] **11.2 3-Band Parametric Channel EQ**
   - [ ] Low Shelf (80–250 Hz) for controlling boominess or boosting sub thump.
   - [ ] Parametric Mid Peak/Notch (200 Hz – 8 kHz) with adjustable Q factor for cutting boxy resonances.

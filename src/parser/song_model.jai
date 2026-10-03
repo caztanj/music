@@ -340,6 +340,11 @@ Mixer_Track_Definition :: struct {
     pan: float = 0.0;
     delay_time_seconds: float = 0.0;
     delay_feedback: float = 0.0;
+    reverb_enabled: bool = false;
+    reverb_room_size: float = 0.5;
+    reverb_damping: float = 0.5;
+    reverb_predelay_milliseconds: float = 10.0;
+    reverb_mix: float = 0.3;
     output_target: string = "master";
     location: Source_Location;
 }
@@ -348,6 +353,11 @@ Master_Track_Definition :: struct {
     gain: float = 1.0;
     limiter_enabled: bool = true;
     limiter_ceiling_decibels: float = -0.1;
+    reverb_enabled: bool = false;
+    reverb_room_size: float = 0.5;
+    reverb_damping: float = 0.5;
+    reverb_predelay_milliseconds: float = 10.0;
+    reverb_mix: float = 0.3;
     location: Source_Location;
 }
 

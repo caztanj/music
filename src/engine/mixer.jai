@@ -13,15 +13,19 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         channel.is_soloed = false;
         channel.output_target = "master";
         channel.delay_enabled = false;
+        channel.reverb_enabled = false;
         channel.filter_enabled = false;
 
         initialize_stereo_delay(*channel.stereo_delay, sample_rate);
+        initialize_studio_reverb(*channel.reverb, sample_rate);
         initialize_filter_insert(*channel.filter_insert, sample_rate);
 
         track_index += 1;
     }
 
     mixer.master.gain = 1.0;
+    mixer.master.reverb_enabled = false;
+    initialize_studio_reverb(*mixer.master.reverb, sample_rate);
     mixer.master.limiter_enabled = true;
     initialize_master_limiter(*mixer.master.limiter, sample_rate);
 }
@@ -30,8 +34,11 @@ deinitialize_mixer :: (mixer: *Mixer) {
     track_index := 0;
     while track_index < MAXIMUM_TRACKS {
         deinitialize_stereo_delay(*mixer.tracks[track_index].stereo_delay);
+        deinitialize_studio_reverb(*mixer.tracks[track_index].reverb);
         track_index += 1;
     }
+
+    deinitialize_studio_reverb(*mixer.master.reverb);
 }
 
 configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Definition, sample_rate: s64 = DEFAULT_SAMPLE_RATE, beats_per_minute: float = 120.0) {
@@ -52,12 +59,37 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                 channel.delay_enabled = true;
                 configure_stereo_delay(*channel.stereo_delay, track_definition.delay_time_seconds, track_definition.delay_feedback, wet_level = 0.5, dry_level = 1.0);
             }
+
+            if track_definition.reverb_enabled {
+                channel.reverb_enabled = true;
+                configure_studio_reverb(
+                    *channel.reverb,
+                    room_size = track_definition.reverb_room_size,
+                    damping = track_definition.reverb_damping,
+                    predelay_milliseconds = track_definition.reverb_predelay_milliseconds,
+                    wet_level = track_definition.reverb_mix,
+                    dry_level = 1.0,
+                    stereo_width = 1.0
+                );
+            }
         }
 
         definition_index += 1;
     }
 
     mixer.master.gain = mixer_definition.master.gain;
+    if mixer_definition.master.reverb_enabled {
+        mixer.master.reverb_enabled = true;
+        configure_studio_reverb(
+            *mixer.master.reverb,
+            room_size = mixer_definition.master.reverb_room_size,
+            damping = mixer_definition.master.reverb_damping,
+            predelay_milliseconds = mixer_definition.master.reverb_predelay_milliseconds,
+            wet_level = mixer_definition.master.reverb_mix,
+            dry_level = 1.0,
+            stereo_width = 1.0
+        );
+    }
     mixer.master.limiter_enabled = mixer_definition.master.limiter_enabled;
     configure_master_limiter(*mixer.master.limiter, mixer_definition.master.limiter_ceiling_decibels);
 }
@@ -162,6 +194,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                     left_sample, right_sample = process_stereo_delay(*channel.stereo_delay, left_sample, right_sample);
                 }
 
+                if channel.reverb_enabled {
+                    left_sample, right_sample = process_studio_reverb(*channel.reverb, left_sample, right_sample);
+                }
+
                 mixer.master.left_buffer[frame_index] += left_sample * pan_gain_left;
                 mixer.master.right_buffer[frame_index] += right_sample * pan_gain_right;
 
@@ -176,6 +212,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
     while frame_index < clamped_frame_count {
         master_left := mixer.master.left_buffer[frame_index] * mixer.master.gain;
         master_right := mixer.master.right_buffer[frame_index] * mixer.master.gain;
+
+        if mixer.master.reverb_enabled {
+            master_left, master_right = process_studio_reverb(*mixer.master.reverb, master_left, master_right);
+        }
 
         if mixer.master.limiter_enabled {
             master_left, master_right = process_master_limiter(*mixer.master.limiter, master_left, master_right);
@@ -216,6 +256,8 @@ Mixer_Channel :: struct {
     output_target: string = "master";
     stereo_delay: Stereo_Delay;
     delay_enabled: bool = false;
+    reverb: Studio_Reverb;
+    reverb_enabled: bool = false;
     filter_insert: Filter_Insert;
     filter_enabled: bool = false;
     left_buffer: [MAXIMUM_BLOCK_SIZE] float;
@@ -224,6 +266,8 @@ Mixer_Channel :: struct {
 
 Master_Channel :: struct {
     gain: float = 1.0;
+    reverb: Studio_Reverb;
+    reverb_enabled: bool = false;
     limiter: Master_Limiter;
     limiter_enabled: bool = true;
     left_buffer: [MAXIMUM_BLOCK_SIZE] float;

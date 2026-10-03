@@ -801,6 +801,26 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             }
             track.output_target = ifx output_token.type == .STRING then output_token.string_value else output_token.text;
             advance_token(parser);
+        } else if parameter_name == "reverb" || parameter_name == "reverb_mix" || parameter_name == "reverb_wet" {
+            reverb_value, reverb_success := parse_number(parser);
+            if !reverb_success return false;
+            track.reverb_mix = cast(float) reverb_value;
+            track.reverb_enabled = true;
+        } else if parameter_name == "reverb_room" || parameter_name == "reverb_room_size" || parameter_name == "reverb_size" {
+            room_value, room_success := parse_number(parser);
+            if !room_success return false;
+            track.reverb_room_size = cast(float) room_value;
+            track.reverb_enabled = true;
+        } else if parameter_name == "reverb_damp" || parameter_name == "reverb_damping" {
+            damping_value, damping_success := parse_number(parser);
+            if !damping_success return false;
+            track.reverb_damping = cast(float) damping_value;
+            track.reverb_enabled = true;
+        } else if parameter_name == "reverb_predelay" || parameter_name == "reverb_delay" {
+            predelay_value, predelay_success := parse_number(parser);
+            if !predelay_success return false;
+            track.reverb_predelay_milliseconds = cast(float) predelay_value;
+            track.reverb_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -868,6 +888,26 @@ parse_master_track_parameters :: (parser: *Parser, master_track: *Master_Track_D
             if unit_token.type == .IDENTIFIER && (unit_token.text == "db" || unit_token.text == "decibels") {
                 advance_token(parser);
             }
+        } else if parameter_name == "reverb" || parameter_name == "reverb_mix" || parameter_name == "reverb_wet" {
+            reverb_value, reverb_success := parse_number(parser);
+            if !reverb_success return false;
+            master_track.reverb_mix = cast(float) reverb_value;
+            master_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_room" || parameter_name == "reverb_room_size" || parameter_name == "reverb_size" {
+            room_value, room_success := parse_number(parser);
+            if !room_success return false;
+            master_track.reverb_room_size = cast(float) room_value;
+            master_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_damp" || parameter_name == "reverb_damping" {
+            damping_value, damping_success := parse_number(parser);
+            if !damping_success return false;
+            master_track.reverb_damping = cast(float) damping_value;
+            master_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_predelay" || parameter_name == "reverb_delay" {
+            predelay_value, predelay_success := parse_number(parser);
+            if !predelay_success return false;
+            master_track.reverb_predelay_milliseconds = cast(float) predelay_value;
+            master_track.reverb_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown master parameter '%'", parameter_name));
             return false;
