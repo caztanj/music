@@ -94,3 +94,4 @@ current_test_failed := false;
 #import "File";
 #import "Windows";
 #import "Thread";
+#import "Atomics";

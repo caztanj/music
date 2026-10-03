@@ -8,7 +8,7 @@
 | **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | 🟢 Complete |
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | 🟢 Complete |
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
-| **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟡 In Progress |
+| **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟢 Complete |
 | **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | ⚪ Not Started |
 | **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | ⚪ Not Started |
 
@@ -160,11 +160,11 @@
 - [x] **7.1 File Watcher Thread (`src/hot_reload/watcher.jai`)**
   - [x] Monitor loaded `.song` file timestamp / change notifications.
   - [x] Debounce multiple quick editor writes (50–100 ms debounce).
-- [ ] **7.2 Lock-Free State Swap**
-  - [ ] Parse updated text in the watcher thread into a candidate `SongState`.
-  - [ ] If syntax errors occur, print diagnostic error to console without stopping playback.
-  - [ ] If parse succeeds, perform an atomic pointer swap to replace the active song state.
-  - [ ] Retain active voices smoothly during the transition.
+- [x] **7.2 Lock-Free State Swap**
+  - [x] Parse updated text in the watcher thread into a candidate `SongState`.
+  - [x] If syntax errors occur, print diagnostic error to console without stopping playback.
+  - [x] If parse succeeds, perform an atomic pointer swap to replace the active song state.
+  - [x] Retain active voices smoothly during the transition.
 
 **Acceptance Criteria**: Modifying a pattern or tempo in a text editor and saving instantly updates playback within 100 ms without audio pops.
 
