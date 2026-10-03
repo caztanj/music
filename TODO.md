@@ -6,10 +6,9 @@
 | **Phase 2** | Audio Output & WAV Pipeline | WAV file writer & real-time audio playback | 🟢 Complete |
 | **Phase 3** | Text Specification & Parser | Lexer, AST, parser & diagnostic error messages | 🟢 Complete |
 | **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | 🟢 Complete |
-| **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | ⚪ Not Started |
-
-| **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | ⚪ Not Started |
-| **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | ⚪ Not Started |
+| **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | 🟢 Complete |
+| **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
+| **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟡 In Progress |
 | **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | ⚪ Not Started |
 | **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | ⚪ Not Started |
 
@@ -158,9 +157,9 @@
 
 > **Goal**: Instant hot reloading of `.song` files upon save without interrupting playback or causing audio glitches.
 
-- [ ] **7.1 File Watcher Thread (`src/hot_reload/watcher.jai`)**
-  - [ ] Monitor loaded `.song` file timestamp / change notifications.
-  - [ ] Debounce multiple quick editor writes (50–100 ms debounce).
+- [x] **7.1 File Watcher Thread (`src/hot_reload/watcher.jai`)**
+  - [x] Monitor loaded `.song` file timestamp / change notifications.
+  - [x] Debounce multiple quick editor writes (50–100 ms debounce).
 - [ ] **7.2 Lock-Free State Swap**
   - [ ] Parse updated text in the watcher thread into a candidate `SongState`.
   - [ ] If syntax errors occur, print diagnostic error to console without stopping playback.

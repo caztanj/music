@@ -12,6 +12,7 @@ main :: () {
     effects_tests();
     mixer_tests();
     sequencer_tests();
+    watcher_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -85,6 +86,8 @@ current_test_failed := false;
 #load "engine/tests/voice_manager_tests.jai";
 #load "engine/tests/mixer_tests.jai";
 #load "engine/tests/sequencer_tests.jai";
+#load "hot_reload/watcher.jai";
+#load "hot_reload/tests/watcher_tests.jai";
 
 #import "Basic";
 #import "Math";

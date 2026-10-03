@@ -155,6 +155,7 @@ Command_Line_Options :: struct {
 #load "engine/voice_manager.jai";
 #load "engine/mixer.jai";
 #load "engine/sequencer.jai";
+#load "hot_reload/watcher.jai";
 
 #import "Basic";
 #import "Math";
