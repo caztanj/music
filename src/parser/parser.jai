@@ -730,6 +730,33 @@ parse_mixer_section :: (parser: *Parser, song_specification: *Song_Specification
             if !success return false;
 
             array_add(*song_specification.mixer.tracks, track);
+        } else if token.text == "aux" || token.text == "return" {
+            advance_token(parser);
+            aux_index_token, aux_index_success := consume_token(parser, .INTEGER, "Expected aux index number after 'aux' or 'return'");
+            if !aux_index_success return false;
+
+            aux_track: Aux_Track_Definition;
+            aux_track.aux_index = aux_index_token.integer_value;
+            aux_track.location = token.location;
+
+            if current_token(parser).type == .OPEN_PARENTHESIS {
+                advance_token(parser);
+                name_token := current_token(parser);
+                if name_token.type == .IDENTIFIER || name_token.type == .STRING {
+                    aux_track.name = ifx name_token.type == .STRING then name_token.string_value else name_token.text;
+                    advance_token(parser);
+                }
+                close_token, close_success := consume_token(parser, .CLOSE_PARENTHESIS, "Expected ')' after aux name");
+                if !close_success return false;
+            }
+
+            colon_token, colon_success := consume_token(parser, .COLON, "Expected ':' after aux declaration");
+            if !colon_success return false;
+
+            success := parse_aux_track_parameters(parser, *aux_track);
+            if !success return false;
+
+            array_add(*song_specification.mixer.aux_tracks, aux_track);
         } else if token.text == "master" {
             song_specification.mixer.master.location = token.location;
             advance_token(parser);
@@ -740,7 +767,7 @@ parse_mixer_section :: (parser: *Parser, song_specification: *Song_Specification
             success := parse_master_track_parameters(parser, *song_specification.mixer.master);
             if !success return false;
         } else {
-            set_error(parser, token.location, sprint("Unknown mixer item '%', expected 'track' or 'master'", token.text));
+            set_error(parser, token.location, sprint("Unknown mixer item '%', expected 'track', 'aux', 'return', or 'master'", token.text));
             return false;
         }
     }
@@ -1039,8 +1066,299 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if unit_token.type == .IDENTIFIER && (unit_token.text == "db" || unit_token.text == "decibels") {
                 advance_token(parser);
             }
+        } else if parameter_name == "send_1" || parameter_name == "send1" || parameter_name == "aux_1" || parameter_name == "aux1" || parameter_name == "send_reverb" || parameter_name == "reverb_send" {
+            send_value, send_success := parse_number(parser);
+            if !send_success return false;
+            track.send_levels[0] = cast(float) send_value;
+        } else if parameter_name == "send_2" || parameter_name == "send2" || parameter_name == "aux_2" || parameter_name == "aux2" || parameter_name == "send_delay" || parameter_name == "delay_send" {
+            send_value, send_success := parse_number(parser);
+            if !send_success return false;
+            track.send_levels[1] = cast(float) send_value;
+        } else if parameter_name == "send_3" || parameter_name == "send3" || parameter_name == "aux_3" || parameter_name == "aux3" {
+            send_value, send_success := parse_number(parser);
+            if !send_success return false;
+            track.send_levels[2] = cast(float) send_value;
+        } else if parameter_name == "send_4" || parameter_name == "send4" || parameter_name == "aux_4" || parameter_name == "aux4" {
+            send_value, send_success := parse_number(parser);
+            if !send_success return false;
+            track.send_levels[3] = cast(float) send_value;
+        } else if parameter_name == "send_1_pre" || parameter_name == "send1_pre" || parameter_name == "send_1_prefader" || parameter_name == "pre_1" || parameter_name == "prefader_1" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER {
+                set_error(parser, type_token.location, "Expected 'on', 'off', 'true', or 'false' for pre-fader");
+                return false;
+            }
+            track.send_pre_fader[0] = (type_token.text == "on" || type_token.text == "true");
+            advance_token(parser);
+        } else if parameter_name == "send_2_pre" || parameter_name == "send2_pre" || parameter_name == "send_2_prefader" || parameter_name == "pre_2" || parameter_name == "prefader_2" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER {
+                set_error(parser, type_token.location, "Expected 'on', 'off', 'true', or 'false' for pre-fader");
+                return false;
+            }
+            track.send_pre_fader[1] = (type_token.text == "on" || type_token.text == "true");
+            advance_token(parser);
+        } else if parameter_name == "send_3_pre" || parameter_name == "send3_pre" || parameter_name == "send_3_prefader" || parameter_name == "pre_3" || parameter_name == "prefader_3" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER {
+                set_error(parser, type_token.location, "Expected 'on', 'off', 'true', or 'false' for pre-fader");
+                return false;
+            }
+            track.send_pre_fader[2] = (type_token.text == "on" || type_token.text == "true");
+            advance_token(parser);
+        } else if parameter_name == "send_4_pre" || parameter_name == "send4_pre" || parameter_name == "send_4_prefader" || parameter_name == "pre_4" || parameter_name == "prefader_4" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER {
+                set_error(parser, type_token.location, "Expected 'on', 'off', 'true', or 'false' for pre-fader");
+                return false;
+            }
+            track.send_pre_fader[3] = (type_token.text == "on" || type_token.text == "true");
+            advance_token(parser);
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+parse_aux_track_parameters :: (parser: *Parser, aux_track: *Aux_Track_Definition) -> bool {
+    first_parameter := true;
+
+    while !parser.has_error && parser.current_token_index < parser.tokens.count {
+        token := current_token(parser);
+
+        if token.type == .NEWLINE || token.type == .OPEN_BRACKET || token.type == .END_OF_FILE {
+            break;
+        }
+
+        if !first_parameter {
+            comma_token, comma_success := consume_token(parser, .COMMA, "Expected ',' between aux parameters");
+            if !comma_success return false;
+        }
+
+        first_parameter = false;
+        parameter_token := current_token(parser);
+
+        if parameter_token.type != .IDENTIFIER {
+            set_error(parser, parameter_token.location, "Expected aux parameter name");
+            return false;
+        }
+
+        parameter_name := parameter_token.text;
+        advance_token(parser);
+
+        equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after aux parameter name");
+        if !equals_success return false;
+
+        if parameter_name == "gain" || parameter_name == "volume" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.gain = cast(float) gain_value;
+        } else if parameter_name == "pan" {
+            pan_value, pan_success := parse_number(parser);
+            if !pan_success return false;
+            aux_track.pan = cast(float) pan_value;
+        } else if parameter_name == "delay" {
+            delay_value, delay_success := parse_number(parser);
+            if !delay_success return false;
+            aux_track.delay_time_seconds = cast(float) delay_value;
+        } else if parameter_name == "feedback" {
+            feedback_value, feedback_success := parse_number(parser);
+            if !feedback_success return false;
+            aux_track.delay_feedback = cast(float) feedback_value;
+        } else if parameter_name == "reverb" || parameter_name == "reverb_mix" || parameter_name == "reverb_wet" {
+            reverb_value, reverb_success := parse_number(parser);
+            if !reverb_success return false;
+            aux_track.reverb_mix = cast(float) reverb_value;
+            aux_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_room" || parameter_name == "reverb_room_size" || parameter_name == "reverb_size" || parameter_name == "room" {
+            room_value, room_success := parse_number(parser);
+            if !room_success return false;
+            aux_track.reverb_room_size = cast(float) room_value;
+            aux_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_damp" || parameter_name == "reverb_damping" || parameter_name == "damp" || parameter_name == "damping" {
+            damping_value, damping_success := parse_number(parser);
+            if !damping_success return false;
+            aux_track.reverb_damping = cast(float) damping_value;
+            aux_track.reverb_enabled = true;
+        } else if parameter_name == "reverb_predelay" || parameter_name == "reverb_delay" || parameter_name == "predelay" {
+            predelay_value, predelay_success := parse_number(parser);
+            if !predelay_success return false;
+            aux_track.reverb_predelay_milliseconds = cast(float) predelay_value;
+            aux_track.reverb_enabled = true;
+        } else if parameter_name == "eq_low" || parameter_name == "eq_low_gain" || parameter_name == "low_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.equalizer_low_gain_decibels = cast(float) gain_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_low_freq" || parameter_name == "eq_low_frequency" || parameter_name == "low_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            aux_track.equalizer_low_frequency_hertz = cast(float) frequency_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid" || parameter_name == "eq_mid_gain" || parameter_name == "mid_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.equalizer_mid_gain_decibels = cast(float) gain_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_freq" || parameter_name == "eq_mid_frequency" || parameter_name == "mid_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            aux_track.equalizer_mid_frequency_hertz = cast(float) frequency_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_q" || parameter_name == "mid_q" || parameter_name == "eq_q" {
+            quality_factor_value, quality_factor_success := parse_number(parser);
+            if !quality_factor_success return false;
+            aux_track.equalizer_mid_quality_factor = cast(float) quality_factor_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high" || parameter_name == "eq_high_gain" || parameter_name == "high_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.equalizer_high_gain_decibels = cast(float) gain_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high_freq" || parameter_name == "eq_high_frequency" || parameter_name == "high_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            aux_track.equalizer_high_frequency_hertz = cast(float) frequency_value;
+            aux_track.equalizer_enabled = true;
+        } else if parameter_name == "chorus" || parameter_name == "chorus_mix" || parameter_name == "flanger" || parameter_name == "flanger_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            aux_track.chorus_mix = cast(float) mix_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_rate" || parameter_name == "chorus_speed" || parameter_name == "flanger_rate" || parameter_name == "flanger_speed" {
+            rate_value, rate_success := parse_number(parser);
+            if !rate_success return false;
+            aux_track.chorus_rate_hertz = cast(float) rate_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_depth" || parameter_name == "flanger_depth" {
+            depth_value, depth_success := parse_number(parser);
+            if !depth_success return false;
+            aux_track.chorus_depth_milliseconds = cast(float) depth_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_delay" || parameter_name == "chorus_time" || parameter_name == "flanger_delay" || parameter_name == "flanger_time" {
+            delay_value, delay_success := parse_number(parser);
+            if !delay_success return false;
+            aux_track.chorus_center_delay_milliseconds = cast(float) delay_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_feedback" || parameter_name == "flanger_feedback" {
+            feedback_value, feedback_success := parse_number(parser);
+            if !feedback_success return false;
+            aux_track.chorus_feedback = cast(float) feedback_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_phase" || parameter_name == "chorus_stereo_phase" || parameter_name == "flanger_phase" {
+            phase_value, phase_success := parse_number(parser);
+            if !phase_success return false;
+            aux_track.chorus_stereo_phase_degrees = cast(float) phase_value;
+            aux_track.chorus_enabled = true;
+        } else if parameter_name == "saturation_type" || parameter_name == "saturation_mode" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER && type_token.type != .STRING {
+                set_error(parser, type_token.location, "Expected saturation type name");
+                return false;
+            }
+            type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+            saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+            if !saturation_type_found {
+                set_error(parser, type_token.location, sprint("Unknown saturation type '%'", type_text));
+                return false;
+            }
+            aux_track.saturation_type = saturation_type;
+            aux_track.saturation_enabled = saturation_type != .NONE;
+            advance_token(parser);
+        } else if parameter_name == "saturation" || parameter_name == "drive" || parameter_name == "saturation_drive" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER || type_token.type == .STRING {
+                type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+                saturation_type, saturation_type_found := string_to_saturation_type(type_text);
+                if saturation_type_found {
+                    aux_track.saturation_type = saturation_type;
+                    aux_track.saturation_enabled = saturation_type != .NONE;
+                    advance_token(parser);
+                } else if type_text == "on" || type_text == "true" {
+                    aux_track.saturation_enabled = true;
+                    advance_token(parser);
+                } else if type_text == "off" || type_text == "false" {
+                    aux_track.saturation_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Unknown saturation parameter value '%'", type_text));
+                    return false;
+                }
+            } else {
+                drive_value, drive_success := parse_number(parser);
+                if !drive_success return false;
+                aux_track.saturation_drive = cast(float) drive_value;
+                aux_track.saturation_enabled = true;
+            }
+        } else if parameter_name == "saturation_mix" || parameter_name == "saturation_wet" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            aux_track.saturation_mix = cast(float) mix_value;
+            aux_track.saturation_enabled = true;
+        } else if parameter_name == "saturation_gain" || parameter_name == "saturation_output" || parameter_name == "saturation_out" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.saturation_output_gain = cast(float) gain_value;
+            aux_track.saturation_enabled = true;
+        } else if parameter_name == "compressor" || parameter_name == "comp" {
+            type_token := current_token(parser);
+            if type_token.type == .IDENTIFIER {
+                if type_token.text == "on" || type_token.text == "true" {
+                    aux_track.compressor_enabled = true;
+                    advance_token(parser);
+                } else if type_token.text == "off" || type_token.text == "false" {
+                    aux_track.compressor_enabled = false;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, type_token.location, sprint("Expected 'on', 'off', 'true', or 'false' for compressor, got '%'", type_token.text));
+                    return false;
+                }
+            } else {
+                threshold_value, threshold_success := parse_number(parser);
+                if !threshold_success return false;
+                aux_track.compressor_threshold_decibels = cast(float) threshold_value;
+                aux_track.compressor_enabled = true;
+            }
+        } else if parameter_name == "comp_threshold" || parameter_name == "compressor_threshold" || parameter_name == "threshold" {
+            threshold_value, threshold_success := parse_number(parser);
+            if !threshold_success return false;
+            aux_track.compressor_threshold_decibels = cast(float) threshold_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_ratio" || parameter_name == "compressor_ratio" || parameter_name == "ratio" {
+            ratio_value, ratio_success := parse_number(parser);
+            if !ratio_success return false;
+            aux_track.compressor_ratio = cast(float) ratio_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_attack" || parameter_name == "compressor_attack" || parameter_name == "attack" {
+            attack_value, attack_success := parse_number(parser);
+            if !attack_success return false;
+            aux_track.compressor_attack_milliseconds = cast(float) attack_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_release" || parameter_name == "compressor_release" || parameter_name == "release" {
+            release_value, release_success := parse_number(parser);
+            if !release_success return false;
+            aux_track.compressor_release_milliseconds = cast(float) release_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_knee" || parameter_name == "compressor_knee" || parameter_name == "knee" {
+            knee_value, knee_success := parse_number(parser);
+            if !knee_success return false;
+            aux_track.compressor_knee_decibels = cast(float) knee_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_gain" || parameter_name == "comp_makeup" || parameter_name == "compressor_gain" || parameter_name == "compressor_makeup" || parameter_name == "makeup_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            aux_track.compressor_makeup_gain_decibels = cast(float) gain_value;
+            aux_track.compressor_enabled = true;
+        } else if parameter_name == "comp_mix" || parameter_name == "compressor_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            aux_track.compressor_mix = cast(float) mix_value;
+            aux_track.compressor_enabled = true;
+        } else {
+            set_error(parser, parameter_token.location, sprint("Unknown aux parameter '%'", parameter_name));
             return false;
         }
     }
@@ -1502,6 +1820,17 @@ validate_song_specification :: (parser: *Parser, song_specification: *Song_Speci
         }
 
         mixer_track_index += 1;
+    }
+
+    aux_track_index := 0;
+    while aux_track_index < song_specification.mixer.aux_tracks.count {
+        aux_track := *song_specification.mixer.aux_tracks[aux_track_index];
+        if aux_track.aux_index < 1 || aux_track.aux_index > MAXIMUM_AUX_TRACKS {
+            set_error(parser, aux_track.location, sprint("Invalid aux track index %", aux_track.aux_index));
+            return false;
+        }
+
+        aux_track_index += 1;
     }
 
     return true;

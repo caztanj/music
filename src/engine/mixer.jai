@@ -21,6 +21,13 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         channel.chorus_flanger_enabled = false;
         channel.filter_enabled = false;
 
+        send_index := 0;
+        while send_index < MAXIMUM_AUX_TRACKS {
+            channel.send_levels[send_index] = 0.0;
+            channel.send_pre_fader[send_index] = false;
+            send_index += 1;
+        }
+
         initialize_stereo_delay(*channel.stereo_delay, sample_rate);
         initialize_studio_reverb(*channel.reverb, sample_rate);
         initialize_parametric_equalizer(*channel.equalizer, sample_rate);
@@ -30,6 +37,33 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         initialize_filter_insert(*channel.filter_insert, sample_rate);
 
         track_index += 1;
+    }
+
+    aux_index := 0;
+    while aux_index < MAXIMUM_AUX_TRACKS {
+        aux := *mixer.aux_tracks[aux_index];
+        aux.aux_index = aux_index + 1;
+        aux.name = "";
+        aux.gain = 1.0;
+        aux.pan = 0.0;
+        aux.is_muted = false;
+        aux.delay_enabled = false;
+        aux.reverb_enabled = false;
+        aux.equalizer_enabled = false;
+        aux.compressor_enabled = false;
+        aux.saturation_enabled = false;
+        aux.chorus_flanger_enabled = false;
+        aux.filter_enabled = false;
+
+        initialize_stereo_delay(*aux.stereo_delay, sample_rate);
+        initialize_studio_reverb(*aux.reverb, sample_rate);
+        initialize_parametric_equalizer(*aux.equalizer, sample_rate);
+        initialize_dynamic_compressor(*aux.compressor, sample_rate);
+        initialize_saturation_insert(*aux.saturation);
+        initialize_chorus_flanger(*aux.chorus_flanger, sample_rate);
+        initialize_filter_insert(*aux.filter_insert, sample_rate);
+
+        aux_index += 1;
     }
 
     mixer.master.gain = 1.0;
@@ -54,6 +88,14 @@ deinitialize_mixer :: (mixer: *Mixer) {
         deinitialize_studio_reverb(*mixer.tracks[track_index].reverb);
         deinitialize_chorus_flanger(*mixer.tracks[track_index].chorus_flanger);
         track_index += 1;
+    }
+
+    aux_index := 0;
+    while aux_index < MAXIMUM_AUX_TRACKS {
+        deinitialize_stereo_delay(*mixer.aux_tracks[aux_index].stereo_delay);
+        deinitialize_studio_reverb(*mixer.aux_tracks[aux_index].reverb);
+        deinitialize_chorus_flanger(*mixer.aux_tracks[aux_index].chorus_flanger);
+        aux_index += 1;
     }
 
     deinitialize_studio_reverb(*mixer.master.reverb);
@@ -157,9 +199,99 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                     output_gain = track_definition.saturation_output_gain
                 );
             }
+
+            send_index := 0;
+            while send_index < MAXIMUM_AUX_TRACKS {
+                channel.send_levels[send_index] = track_definition.send_levels[send_index];
+                channel.send_pre_fader[send_index] = track_definition.send_pre_fader[send_index];
+                send_index += 1;
+            }
         }
 
         definition_index += 1;
+    }
+
+    aux_definition_index := 0;
+    while aux_definition_index < mixer_definition.aux_tracks.count {
+        aux_definition := *mixer_definition.aux_tracks[aux_definition_index];
+        aux, aux_found := find_mixer_aux_channel(mixer, aux_definition.aux_index);
+        if aux_found {
+            aux.name = aux_definition.name;
+            aux.gain = aux_definition.gain;
+            aux.pan = aux_definition.pan;
+
+            if aux_definition.delay_time_seconds > 0.0 {
+                aux.delay_enabled = true;
+                configure_stereo_delay(*aux.stereo_delay, aux_definition.delay_time_seconds, aux_definition.delay_feedback, wet_level = 1.0, dry_level = 0.0);
+            }
+
+            if aux_definition.reverb_enabled {
+                aux.reverb_enabled = true;
+                configure_studio_reverb(
+                    *aux.reverb,
+                    room_size = aux_definition.reverb_room_size,
+                    damping = aux_definition.reverb_damping,
+                    predelay_milliseconds = aux_definition.reverb_predelay_milliseconds,
+                    wet_level = aux_definition.reverb_mix,
+                    dry_level = 0.0,
+                    stereo_width = 1.0
+                );
+            }
+
+            if aux_definition.equalizer_enabled {
+                aux.equalizer_enabled = true;
+                configure_parametric_equalizer(
+                    *aux.equalizer,
+                    aux_definition.equalizer_low_gain_decibels,
+                    aux_definition.equalizer_mid_gain_decibels,
+                    aux_definition.equalizer_high_gain_decibels,
+                    aux_definition.equalizer_low_frequency_hertz,
+                    aux_definition.equalizer_mid_frequency_hertz,
+                    aux_definition.equalizer_mid_quality_factor,
+                    aux_definition.equalizer_high_frequency_hertz
+                );
+            }
+
+            if aux_definition.chorus_enabled {
+                aux.chorus_flanger_enabled = true;
+                configure_chorus_flanger(
+                    *aux.chorus_flanger,
+                    rate_hertz = aux_definition.chorus_rate_hertz,
+                    depth_milliseconds = aux_definition.chorus_depth_milliseconds,
+                    center_delay_milliseconds = aux_definition.chorus_center_delay_milliseconds,
+                    feedback = aux_definition.chorus_feedback,
+                    mix = aux_definition.chorus_mix,
+                    stereo_phase_degrees = aux_definition.chorus_stereo_phase_degrees
+                );
+            }
+
+            if aux_definition.compressor_enabled {
+                aux.compressor_enabled = true;
+                configure_dynamic_compressor(
+                    *aux.compressor,
+                    threshold_decibels = aux_definition.compressor_threshold_decibels,
+                    ratio = aux_definition.compressor_ratio,
+                    attack_milliseconds = aux_definition.compressor_attack_milliseconds,
+                    release_milliseconds = aux_definition.compressor_release_milliseconds,
+                    knee_decibels = aux_definition.compressor_knee_decibels,
+                    makeup_gain_decibels = aux_definition.compressor_makeup_gain_decibels,
+                    mix = aux_definition.compressor_mix
+                );
+            }
+
+            if aux_definition.saturation_enabled {
+                aux.saturation_enabled = true;
+                configure_saturation_insert(
+                    *aux.saturation,
+                    saturation_type = aux_definition.saturation_type,
+                    drive = aux_definition.saturation_drive,
+                    mix = aux_definition.saturation_mix,
+                    output_gain = aux_definition.saturation_output_gain
+                );
+            }
+        }
+
+        aux_definition_index += 1;
     }
 
     mixer.master.gain = mixer_definition.master.gain;
@@ -240,6 +372,14 @@ find_mixer_channel :: (mixer: *Mixer, track_index: s64) -> *Mixer_Channel, bool 
     return *mixer.tracks[track_index - 1], true;
 }
 
+find_mixer_aux_channel :: (mixer: *Mixer, aux_index: s64) -> *Aux_Channel, bool {
+    if aux_index < 1 || aux_index > MAXIMUM_AUX_TRACKS {
+        return null, false;
+    }
+
+    return *mixer.aux_tracks[aux_index - 1], true;
+}
+
 set_channel_mute :: (mixer: *Mixer, track_index: s64, is_muted: bool) {
     channel, channel_found := find_mixer_channel(mixer, track_index);
     if channel_found {
@@ -284,6 +424,19 @@ clear_channel_buffers :: (mixer: *Mixer, frame_count: s64) {
         }
 
         track_index += 1;
+    }
+
+    aux_index := 0;
+    while aux_index < MAXIMUM_AUX_TRACKS {
+        aux := *mixer.aux_tracks[aux_index];
+        frame_index := 0;
+        while frame_index < clamped_frame_count {
+            aux.left_buffer[frame_index] = 0.0;
+            aux.right_buffer[frame_index] = 0.0;
+            frame_index += 1;
+        }
+
+        aux_index += 1;
     }
 
     frame_index := 0;
@@ -378,11 +531,85 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                 mixer.master.left_buffer[frame_index] += left_sample * pan_gain_left;
                 mixer.master.right_buffer[frame_index] += right_sample * pan_gain_right;
 
+                send_index := 0;
+                while send_index < MAXIMUM_AUX_TRACKS {
+                    send_level := channel.send_levels[send_index];
+                    if send_level > 0.0 {
+                        send_gain := send_level;
+                        if !channel.send_pre_fader[send_index] {
+                            send_gain *= channel.gain;
+                        }
+
+                        mixer.aux_tracks[send_index].left_buffer[frame_index] += left_sample * send_gain;
+                        mixer.aux_tracks[send_index].right_buffer[frame_index] += right_sample * send_gain;
+                    }
+
+                    send_index += 1;
+                }
+
                 frame_index += 1;
             }
         }
 
         track_index += 1;
+    }
+
+    aux_index := 0;
+    while aux_index < MAXIMUM_AUX_TRACKS {
+        aux := *mixer.aux_tracks[aux_index];
+        if !aux.is_muted {
+            normalized_pan := (aux.pan + 1.0) * 0.5;
+            if normalized_pan < 0.0 {
+                normalized_pan = 0.0;
+            } else if normalized_pan > 1.0 {
+                normalized_pan = 1.0;
+            }
+
+            pan_angle := cast(float64) normalized_pan * (PI * 0.5);
+            pan_gain_left := cast(float) cos(pan_angle) * aux.gain;
+            pan_gain_right := cast(float) sin(pan_angle) * aux.gain;
+
+            frame_index := 0;
+            while frame_index < clamped_frame_count {
+                left_sample := aux.left_buffer[frame_index];
+                right_sample := aux.right_buffer[frame_index];
+
+                if aux.equalizer_enabled {
+                    left_sample, right_sample = process_parametric_equalizer(*aux.equalizer, left_sample, right_sample);
+                }
+
+                if aux.compressor_enabled {
+                    left_sample, right_sample = process_dynamic_compressor(*aux.compressor, left_sample, right_sample);
+                }
+
+                if aux.saturation_enabled {
+                    left_sample, right_sample = process_saturation_insert(*aux.saturation, left_sample, right_sample);
+                }
+
+                if aux.filter_enabled {
+                    left_sample, right_sample = process_filter_insert(*aux.filter_insert, left_sample, right_sample);
+                }
+
+                if aux.chorus_flanger_enabled {
+                    left_sample, right_sample = process_chorus_flanger(*aux.chorus_flanger, left_sample, right_sample);
+                }
+
+                if aux.delay_enabled {
+                    left_sample, right_sample = process_stereo_delay(*aux.stereo_delay, left_sample, right_sample);
+                }
+
+                if aux.reverb_enabled {
+                    left_sample, right_sample = process_studio_reverb(*aux.reverb, left_sample, right_sample);
+                }
+
+                mixer.master.left_buffer[frame_index] += left_sample * pan_gain_left;
+                mixer.master.right_buffer[frame_index] += right_sample * pan_gain_right;
+
+                frame_index += 1;
+            }
+        }
+
+        aux_index += 1;
     }
 
     frame_index := 0;
@@ -436,8 +663,29 @@ render_mixer_master_block_interleaved :: (mixer: *Mixer, output_buffer: [] float
     }
 }
 
-MAXIMUM_TRACKS :: 16;
-MAXIMUM_BLOCK_SIZE :: 1024;
+Aux_Channel :: struct {
+    aux_index: s64 = 1;
+    name: string;
+    gain: float = 1.0;
+    pan: float = 0.0;
+    is_muted: bool = false;
+    equalizer: Parametric_Equalizer;
+    equalizer_enabled: bool = false;
+    compressor: Dynamic_Compressor;
+    compressor_enabled: bool = false;
+    saturation: Saturation_Insert;
+    saturation_enabled: bool = false;
+    chorus_flanger: Chorus_Flanger;
+    chorus_flanger_enabled: bool = false;
+    stereo_delay: Stereo_Delay;
+    delay_enabled: bool = false;
+    reverb: Studio_Reverb;
+    reverb_enabled: bool = false;
+    filter_insert: Filter_Insert;
+    filter_enabled: bool = false;
+    left_buffer: [MAXIMUM_BLOCK_SIZE] float;
+    right_buffer: [MAXIMUM_BLOCK_SIZE] float;
+}
 
 Mixer_Channel :: struct {
     track_index: s64 = 1;
@@ -448,6 +696,8 @@ Mixer_Channel :: struct {
     is_soloed: bool = false;
     output_target: string = "master";
     sidechain_source_track_index: s64 = 0;
+    send_levels: [MAXIMUM_AUX_TRACKS] float;
+    send_pre_fader: [MAXIMUM_AUX_TRACKS] bool;
     equalizer: Parametric_Equalizer;
     equalizer_enabled: bool = false;
     compressor: Dynamic_Compressor;
@@ -486,6 +736,7 @@ Master_Channel :: struct {
 
 Mixer :: struct {
     tracks: [MAXIMUM_TRACKS] Mixer_Channel;
+    aux_tracks: [MAXIMUM_AUX_TRACKS] Aux_Channel;
     master: Master_Channel;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
     beats_per_minute: float = 120.0;

@@ -80,3 +80,6 @@ note_to_midi :: (name: string) -> s32 {
 DEFAULT_SAMPLE_RATE :: 44100;
 DEFAULT_BPM         :: 120.0;
 STEPS_PER_BAR       :: 16;
+MAXIMUM_TRACKS      :: 16;
+MAXIMUM_AUX_TRACKS  :: 4;
+MAXIMUM_BLOCK_SIZE  :: 1024;

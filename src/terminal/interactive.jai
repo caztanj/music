@@ -156,6 +156,15 @@ print_mixer_view :: (mixer: *Mixer) {
         }
         track_index += 1;
     }
+    aux_index := 0;
+    while aux_index < MAXIMUM_AUX_TRACKS {
+        aux := *mixer.aux_tracks[aux_index];
+        if aux.name.count > 0 || aux.gain != 1.0 || aux.reverb_enabled || aux.delay_enabled {
+            mute_indicator := ifx aux.is_muted then " [MUTED]" else "";
+            print("  Aux % (%): Gain = %, Pan = %%\n", aux.aux_index, aux.name, aux.gain, aux.pan, mute_indicator);
+        }
+        aux_index += 1;
+    }
     print("  Master: Gain = %, Limiter = %\n\n", mixer.master.gain, ifx mixer.master.limiter_enabled then "ON" else "OFF");
 }
 

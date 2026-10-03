@@ -457,7 +457,52 @@ Mixer_Track_Definition :: struct {
     compressor_threshold_set: bool = false;
     compressor_ratio_set: bool = false;
     compressor_attack_set: bool = false;
+    send_levels: [MAXIMUM_AUX_TRACKS] float;
+    send_pre_fader: [MAXIMUM_AUX_TRACKS] bool;
     output_target: string = "master";
+    location: Source_Location;
+}
+
+Aux_Track_Definition :: struct {
+    aux_index: s64 = 1;
+    name: string;
+    gain: float = 1.0;
+    pan: float = 0.0;
+    delay_time_seconds: float = 0.0;
+    delay_feedback: float = 0.0;
+    reverb_enabled: bool = false;
+    reverb_room_size: float = 0.5;
+    reverb_damping: float = 0.5;
+    reverb_predelay_milliseconds: float = 10.0;
+    reverb_mix: float = 1.0;
+    equalizer_enabled: bool = false;
+    equalizer_low_gain_decibels: float = 0.0;
+    equalizer_low_frequency_hertz: float = 120.0;
+    equalizer_mid_gain_decibels: float = 0.0;
+    equalizer_mid_frequency_hertz: float = 1200.0;
+    equalizer_mid_quality_factor: float = 1.0;
+    equalizer_high_gain_decibels: float = 0.0;
+    equalizer_high_frequency_hertz: float = 8000.0;
+    chorus_enabled: bool = false;
+    chorus_rate_hertz: float = 1.0;
+    chorus_depth_milliseconds: float = 2.0;
+    chorus_center_delay_milliseconds: float = 7.0;
+    chorus_feedback: float = 0.0;
+    chorus_mix: float = 0.5;
+    chorus_stereo_phase_degrees: float = 90.0;
+    saturation_enabled: bool = false;
+    saturation_type: Saturation_Type = .TANH;
+    saturation_drive: float = 1.0;
+    saturation_mix: float = 1.0;
+    saturation_output_gain: float = 1.0;
+    compressor_enabled: bool = false;
+    compressor_threshold_decibels: float = -12.0;
+    compressor_ratio: float = 4.0;
+    compressor_attack_milliseconds: float = 10.0;
+    compressor_release_milliseconds: float = 100.0;
+    compressor_knee_decibels: float = 6.0;
+    compressor_makeup_gain_decibels: float = 0.0;
+    compressor_mix: float = 1.0;
     location: Source_Location;
 }
 
@@ -503,6 +548,7 @@ Master_Track_Definition :: struct {
 
 Mixer_Definition :: struct {
     tracks: [..] Mixer_Track_Definition;
+    aux_tracks: [..] Aux_Track_Definition;
     master: Master_Track_Definition;
     location: Source_Location;
 }

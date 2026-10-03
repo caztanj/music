@@ -68,10 +68,10 @@
 - [x] **12.2 Sidechain Ducking Engine**
   - [x] Allow any mixer track to receive sidechain detection signals from another track (e.g. Kick $\to$ Bass, Kick $\to$ Pads).
   - [x] Instant envelope follower with adjustable ducking depth and release timing for rhythmic pumping.
-- [ ] **12.3 Aux Send / Return Busses**
-  - [ ] Dedicated Return tracks (e.g. Aux 1: Master Reverb, Aux 2: Ping-Pong Delay).
-  - [ ] Post-fader / Pre-fader send level knobs per mixer channel strip.
-  - [ ] Summed send buffers processed concurrently before master bus summing.
+- [x] **12.3 Aux Send / Return Busses**
+  - [x] Dedicated Return tracks (e.g. Aux 1: Master Reverb, Aux 2: Ping-Pong Delay).
+  - [x] Post-fader / Pre-fader send level knobs per mixer channel strip.
+  - [x] Summed send buffers processed concurrently before master bus summing.
 
 **Acceptance Criteria**: Bass and synths cleanly duck whenever the kick hits, freeing up master headroom and creating rhythmic groove.
 
