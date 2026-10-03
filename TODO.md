@@ -44,10 +44,10 @@
   - [x] Schroeder / Feedback Delay Network (FDN) stereo reverb algorithm.
   - [x] Controls: Room Size, Decay Time, High-Frequency Damping, Pre-Delay, and Dry/Wet balance.
   - [x] Smooth tail decay without metallic ring or numerical instability.
-- [ ] **11.2 3-Band Parametric Channel EQ**
-  - [ ] Low Shelf (80–250 Hz) for controlling boominess or boosting sub thump.
-  - [ ] Parametric Mid Peak/Notch (200 Hz – 8 kHz) with adjustable Q factor for cutting boxy resonances.
-  - [ ] High Shelf (4 kHz – 16 kHz) for air, brilliance, and sheen.
+- [x] **11.2 3-Band Parametric Channel EQ**
+  - [x] Low Shelf (80–250 Hz) for controlling boominess or boosting sub thump.
+  - [x] Parametric Mid Peak/Notch (200 Hz – 8 kHz) with adjustable Q factor for cutting boxy resonances.
+  - [x] High Shelf (4 kHz – 16 kHz) for air, brilliance, and sheen.
 - [ ] **11.3 Chorus & Flanger Insert**
   - [ ] Modulated short delay lines (1–20 ms) with stereo phase offset for spatial widening and lush chorusing.
   - [ ] Depth, Rate, Feedback, and Mix controls.

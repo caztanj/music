@@ -14,10 +14,12 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         channel.output_target = "master";
         channel.delay_enabled = false;
         channel.reverb_enabled = false;
+        channel.equalizer_enabled = false;
         channel.filter_enabled = false;
 
         initialize_stereo_delay(*channel.stereo_delay, sample_rate);
         initialize_studio_reverb(*channel.reverb, sample_rate);
+        initialize_parametric_equalizer(*channel.equalizer, sample_rate);
         initialize_filter_insert(*channel.filter_insert, sample_rate);
 
         track_index += 1;
@@ -26,6 +28,8 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
     mixer.master.gain = 1.0;
     mixer.master.reverb_enabled = false;
     initialize_studio_reverb(*mixer.master.reverb, sample_rate);
+    mixer.master.equalizer_enabled = false;
+    initialize_parametric_equalizer(*mixer.master.equalizer, sample_rate);
     mixer.master.limiter_enabled = true;
     initialize_master_limiter(*mixer.master.limiter, sample_rate);
 }
@@ -72,6 +76,20 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                     stereo_width = 1.0
                 );
             }
+
+            if track_definition.equalizer_enabled {
+                channel.equalizer_enabled = true;
+                configure_parametric_equalizer(
+                    *channel.equalizer,
+                    track_definition.equalizer_low_gain_decibels,
+                    track_definition.equalizer_mid_gain_decibels,
+                    track_definition.equalizer_high_gain_decibels,
+                    track_definition.equalizer_low_frequency_hertz,
+                    track_definition.equalizer_mid_frequency_hertz,
+                    track_definition.equalizer_mid_quality_factor,
+                    track_definition.equalizer_high_frequency_hertz
+                );
+            }
         }
 
         definition_index += 1;
@@ -90,6 +108,21 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
             stereo_width = 1.0
         );
     }
+
+    if mixer_definition.master.equalizer_enabled {
+        mixer.master.equalizer_enabled = true;
+        configure_parametric_equalizer(
+            *mixer.master.equalizer,
+            mixer_definition.master.equalizer_low_gain_decibels,
+            mixer_definition.master.equalizer_mid_gain_decibels,
+            mixer_definition.master.equalizer_high_gain_decibels,
+            mixer_definition.master.equalizer_low_frequency_hertz,
+            mixer_definition.master.equalizer_mid_frequency_hertz,
+            mixer_definition.master.equalizer_mid_quality_factor,
+            mixer_definition.master.equalizer_high_frequency_hertz
+        );
+    }
+
     mixer.master.limiter_enabled = mixer_definition.master.limiter_enabled;
     configure_master_limiter(*mixer.master.limiter, mixer_definition.master.limiter_ceiling_decibels);
 }
@@ -186,6 +219,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                 left_sample := channel.left_buffer[frame_index];
                 right_sample := channel.right_buffer[frame_index];
 
+                if channel.equalizer_enabled {
+                    left_sample, right_sample = process_parametric_equalizer(*channel.equalizer, left_sample, right_sample);
+                }
+
                 if channel.filter_enabled {
                     left_sample, right_sample = process_filter_insert(*channel.filter_insert, left_sample, right_sample);
                 }
@@ -212,6 +249,10 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
     while frame_index < clamped_frame_count {
         master_left := mixer.master.left_buffer[frame_index] * mixer.master.gain;
         master_right := mixer.master.right_buffer[frame_index] * mixer.master.gain;
+
+        if mixer.master.equalizer_enabled {
+            master_left, master_right = process_parametric_equalizer(*mixer.master.equalizer, master_left, master_right);
+        }
 
         if mixer.master.reverb_enabled {
             master_left, master_right = process_studio_reverb(*mixer.master.reverb, master_left, master_right);
@@ -254,6 +295,8 @@ Mixer_Channel :: struct {
     is_muted: bool = false;
     is_soloed: bool = false;
     output_target: string = "master";
+    equalizer: Parametric_Equalizer;
+    equalizer_enabled: bool = false;
     stereo_delay: Stereo_Delay;
     delay_enabled: bool = false;
     reverb: Studio_Reverb;
@@ -266,6 +309,8 @@ Mixer_Channel :: struct {
 
 Master_Channel :: struct {
     gain: float = 1.0;
+    equalizer: Parametric_Equalizer;
+    equalizer_enabled: bool = false;
     reverb: Studio_Reverb;
     reverb_enabled: bool = false;
     limiter: Master_Limiter;

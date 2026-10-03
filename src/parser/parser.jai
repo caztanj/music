@@ -821,6 +821,41 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if !predelay_success return false;
             track.reverb_predelay_milliseconds = cast(float) predelay_value;
             track.reverb_enabled = true;
+        } else if parameter_name == "eq_low" || parameter_name == "eq_low_gain" || parameter_name == "low_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            track.equalizer_low_gain_decibels = cast(float) gain_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_low_freq" || parameter_name == "eq_low_frequency" || parameter_name == "low_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            track.equalizer_low_frequency_hertz = cast(float) frequency_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid" || parameter_name == "eq_mid_gain" || parameter_name == "mid_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            track.equalizer_mid_gain_decibels = cast(float) gain_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_freq" || parameter_name == "eq_mid_frequency" || parameter_name == "mid_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            track.equalizer_mid_frequency_hertz = cast(float) frequency_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_q" || parameter_name == "mid_q" || parameter_name == "eq_q" {
+            quality_factor_value, quality_factor_success := parse_number(parser);
+            if !quality_factor_success return false;
+            track.equalizer_mid_quality_factor = cast(float) quality_factor_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high" || parameter_name == "eq_high_gain" || parameter_name == "high_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            track.equalizer_high_gain_decibels = cast(float) gain_value;
+            track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high_freq" || parameter_name == "eq_high_frequency" || parameter_name == "high_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            track.equalizer_high_frequency_hertz = cast(float) frequency_value;
+            track.equalizer_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -908,6 +943,41 @@ parse_master_track_parameters :: (parser: *Parser, master_track: *Master_Track_D
             if !predelay_success return false;
             master_track.reverb_predelay_milliseconds = cast(float) predelay_value;
             master_track.reverb_enabled = true;
+        } else if parameter_name == "eq_low" || parameter_name == "eq_low_gain" || parameter_name == "low_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            master_track.equalizer_low_gain_decibels = cast(float) gain_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_low_freq" || parameter_name == "eq_low_frequency" || parameter_name == "low_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            master_track.equalizer_low_frequency_hertz = cast(float) frequency_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid" || parameter_name == "eq_mid_gain" || parameter_name == "mid_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            master_track.equalizer_mid_gain_decibels = cast(float) gain_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_freq" || parameter_name == "eq_mid_frequency" || parameter_name == "mid_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            master_track.equalizer_mid_frequency_hertz = cast(float) frequency_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_mid_q" || parameter_name == "mid_q" || parameter_name == "eq_q" {
+            quality_factor_value, quality_factor_success := parse_number(parser);
+            if !quality_factor_success return false;
+            master_track.equalizer_mid_quality_factor = cast(float) quality_factor_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high" || parameter_name == "eq_high_gain" || parameter_name == "high_gain" {
+            gain_value, gain_success := parse_number(parser);
+            if !gain_success return false;
+            master_track.equalizer_high_gain_decibels = cast(float) gain_value;
+            master_track.equalizer_enabled = true;
+        } else if parameter_name == "eq_high_freq" || parameter_name == "eq_high_frequency" || parameter_name == "high_freq" {
+            frequency_value, frequency_success := parse_number(parser);
+            if !frequency_success return false;
+            master_track.equalizer_high_frequency_hertz = cast(float) frequency_value;
+            master_track.equalizer_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown master parameter '%'", parameter_name));
             return false;

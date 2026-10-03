@@ -113,6 +113,22 @@ string_to_filter_type :: (name: string) -> Filter_Type, bool {
         return .BANDPASS, true;
     }
 
+    if name == "low_shelf" || name == "lowshelf" || name == "shelf_low" {
+        return .LOW_SHELF, true;
+    }
+
+    if name == "high_shelf" || name == "highshelf" || name == "shelf_high" {
+        return .HIGH_SHELF, true;
+    }
+
+    if name == "peaking" || name == "peak" || name == "bell" {
+        return .PEAKING, true;
+    }
+
+    if name == "notch" {
+        return .NOTCH, true;
+    }
+
     return .NONE, false;
 }
 
@@ -196,6 +212,18 @@ filter_type_to_string :: (filter_type: Filter_Type) -> string {
         case .BANDPASS;
             return "bandpass";
 
+        case .LOW_SHELF;
+            return "low_shelf";
+
+        case .HIGH_SHELF;
+            return "high_shelf";
+
+        case .PEAKING;
+            return "peaking";
+
+        case .NOTCH;
+            return "notch";
+
         case .NONE;
             return "none";
 
@@ -218,6 +246,10 @@ Filter_Type :: enum {
     LOWPASS;
     HIGHPASS;
     BANDPASS;
+    LOW_SHELF;
+    HIGH_SHELF;
+    PEAKING;
+    NOTCH;
 }
 
 Instrument_Type :: enum {
@@ -345,6 +377,14 @@ Mixer_Track_Definition :: struct {
     reverb_damping: float = 0.5;
     reverb_predelay_milliseconds: float = 10.0;
     reverb_mix: float = 0.3;
+    equalizer_enabled: bool = false;
+    equalizer_low_gain_decibels: float = 0.0;
+    equalizer_low_frequency_hertz: float = 120.0;
+    equalizer_mid_gain_decibels: float = 0.0;
+    equalizer_mid_frequency_hertz: float = 1200.0;
+    equalizer_mid_quality_factor: float = 1.0;
+    equalizer_high_gain_decibels: float = 0.0;
+    equalizer_high_frequency_hertz: float = 8000.0;
     output_target: string = "master";
     location: Source_Location;
 }
@@ -358,6 +398,14 @@ Master_Track_Definition :: struct {
     reverb_damping: float = 0.5;
     reverb_predelay_milliseconds: float = 10.0;
     reverb_mix: float = 0.3;
+    equalizer_enabled: bool = false;
+    equalizer_low_gain_decibels: float = 0.0;
+    equalizer_low_frequency_hertz: float = 120.0;
+    equalizer_mid_gain_decibels: float = 0.0;
+    equalizer_mid_frequency_hertz: float = 1200.0;
+    equalizer_mid_quality_factor: float = 1.0;
+    equalizer_high_gain_decibels: float = 0.0;
+    equalizer_high_frequency_hertz: float = 8000.0;
     location: Source_Location;
 }
 

@@ -138,4 +138,132 @@ effects_tests :: () {
         expect_true(mixer.master.reverb_enabled);
         expect_near(mixer.master.reverb.wet_level, 0.2, 0.001);
     });
+
+    test("parametric_equalizer_low_shelf_boost_and_cut", () {
+        boosted_equalizer: Parametric_Equalizer;
+        initialize_parametric_equalizer(*boosted_equalizer, 44100);
+        configure_parametric_equalizer(*boosted_equalizer, low_gain_decibels = 6.0, mid_gain_decibels = 0.0, high_gain_decibels = 0.0, low_frequency_hertz = 200.0);
+
+        cut_equalizer: Parametric_Equalizer;
+        initialize_parametric_equalizer(*cut_equalizer, 44100);
+        configure_parametric_equalizer(*cut_equalizer, low_gain_decibels = -6.0, mid_gain_decibels = 0.0, high_gain_decibels = 0.0, low_frequency_hertz = 200.0);
+
+        sample_index := 0;
+        flat_energy: float = 0.0;
+        boosted_energy: float = 0.0;
+        cut_energy: float = 0.0;
+
+        while sample_index < 2000 {
+            phase := (cast(float64) sample_index * 100.0 * 2.0 * PI) / 44100.0;
+            input_sample := cast(float) sin(phase);
+
+            boosted_left, _ := process_parametric_equalizer(*boosted_equalizer, input_sample, input_sample);
+            cut_left, _ := process_parametric_equalizer(*cut_equalizer, input_sample, input_sample);
+
+            if sample_index >= 500 {
+                flat_energy += input_sample * input_sample;
+                boosted_energy += boosted_left * boosted_left;
+                cut_energy += cut_left * cut_left;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(boosted_energy > flat_energy * 2.5);
+        expect_true(cut_energy < flat_energy * 0.5);
+    });
+
+    test("parametric_equalizer_mid_peaking_bell_boost_and_cut", () {
+        boosted_equalizer: Parametric_Equalizer;
+        initialize_parametric_equalizer(*boosted_equalizer, 44100);
+        configure_parametric_equalizer(*boosted_equalizer, low_gain_decibels = 0.0, mid_gain_decibels = 6.0, high_gain_decibels = 0.0, mid_frequency_hertz = 1000.0, mid_quality_factor = 2.0);
+
+        cut_equalizer: Parametric_Equalizer;
+        initialize_parametric_equalizer(*cut_equalizer, 44100);
+        configure_parametric_equalizer(*cut_equalizer, low_gain_decibels = 0.0, mid_gain_decibels = -6.0, high_gain_decibels = 0.0, mid_frequency_hertz = 1000.0, mid_quality_factor = 2.0);
+
+        sample_index := 0;
+        flat_energy: float = 0.0;
+        boosted_energy: float = 0.0;
+        cut_energy: float = 0.0;
+
+        while sample_index < 2000 {
+            phase := (cast(float64) sample_index * 1000.0 * 2.0 * PI) / 44100.0;
+            input_sample := cast(float) sin(phase);
+
+            boosted_left, _ := process_parametric_equalizer(*boosted_equalizer, input_sample, input_sample);
+            cut_left, _ := process_parametric_equalizer(*cut_equalizer, input_sample, input_sample);
+
+            if sample_index >= 500 {
+                flat_energy += input_sample * input_sample;
+                boosted_energy += boosted_left * boosted_left;
+                cut_energy += cut_left * cut_left;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(boosted_energy > flat_energy * 2.5);
+        expect_true(cut_energy < flat_energy * 0.5);
+    });
+
+    test("parametric_equalizer_high_shelf_air_boost", () {
+        equalizer: Parametric_Equalizer;
+        initialize_parametric_equalizer(*equalizer, 44100);
+        configure_parametric_equalizer(*equalizer, low_gain_decibels = 0.0, mid_gain_decibels = 0.0, high_gain_decibels = 6.0, high_frequency_hertz = 8000.0);
+
+        sample_index := 0;
+        flat_energy: float = 0.0;
+        boosted_energy: float = 0.0;
+
+        while sample_index < 2000 {
+            phase := (cast(float64) sample_index * 10000.0 * 2.0 * PI) / 44100.0;
+            input_sample := cast(float) sin(phase);
+
+            boosted_left, _ := process_parametric_equalizer(*equalizer, input_sample, input_sample);
+
+            if sample_index >= 500 {
+                flat_energy += input_sample * input_sample;
+                boosted_energy += boosted_left * boosted_left;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(boosted_energy > flat_energy * 2.0);
+    });
+
+    test("mixer_parser_equalizer_arguments", () {
+        song_text := "[project]\nname = \"EQ Mixer Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\")\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 0.9, eq_low = 3.5, eq_low_freq = 100, eq_mid = -2.5, eq_mid_freq = 800, eq_mid_q = 1.5, eq_high = 4.0, eq_high_freq = 10000, output = master\nmaster: gain = 1.0, eq_low = -1.5, eq_high = 2.5, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        track := *specification.mixer.tracks[0];
+        expect_true(track.equalizer_enabled);
+        expect_near(track.equalizer_low_gain_decibels, 3.5, 0.001);
+        expect_near(track.equalizer_low_frequency_hertz, 100.0, 0.001);
+        expect_near(track.equalizer_mid_gain_decibels, -2.5, 0.001);
+        expect_near(track.equalizer_mid_frequency_hertz, 800.0, 0.001);
+        expect_near(track.equalizer_mid_quality_factor, 1.5, 0.001);
+        expect_near(track.equalizer_high_gain_decibels, 4.0, 0.001);
+        expect_near(track.equalizer_high_frequency_hertz, 10000.0, 0.001);
+
+        expect_true(specification.mixer.master.equalizer_enabled);
+        expect_near(specification.mixer.master.equalizer_low_gain_decibels, -1.5, 0.001);
+        expect_near(specification.mixer.master.equalizer_high_gain_decibels, 2.5, 0.001);
+
+        mixer: Mixer;
+        configure_mixer_from_definition(*mixer, specification.mixer, 44100, 120.0);
+        defer deinitialize_mixer(*mixer);
+
+        expect_true(mixer.tracks[0].equalizer_enabled);
+        expect_near(mixer.tracks[0].equalizer.low_band.gain_decibels, 3.5, 0.001);
+        expect_near(mixer.tracks[0].equalizer.low_band.frequency_hertz, 100.0, 0.001);
+        expect_near(mixer.tracks[0].equalizer.mid_band.gain_decibels, -2.5, 0.001);
+        expect_near(mixer.tracks[0].equalizer.mid_band.quality_factor, 1.5, 0.001);
+        expect_true(mixer.master.equalizer_enabled);
+        expect_near(mixer.master.equalizer.low_band.gain_decibels, -1.5, 0.001);
+        expect_near(mixer.master.equalizer.high_band.gain_decibels, 2.5, 0.001);
+    });
 }

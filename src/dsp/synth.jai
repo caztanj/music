@@ -509,7 +509,7 @@ polyblep_residual :: (phase: float64, phase_increment: float64) -> float {
     return 0.0;
 }
 
-calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_hertz: float, resonance: float, sample_rate: s64) -> Biquad_Coefficients {
+calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_hertz: float, resonance: float, sample_rate: s64, gain_decibels: float = 0.0, quality_factor_override: float = 0.0) -> Biquad_Coefficients {
     coefficients: Biquad_Coefficients;
 
     if filter_type == .NONE || sample_rate <= 0 {
@@ -525,10 +525,17 @@ calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_her
     }
 
     quality_factor := 0.707 + cast(float64) resonance * 4.0;
+    if quality_factor_override > 0.0 {
+        quality_factor = cast(float64) quality_factor_override;
+    }
+
     angular_frequency := 2.0 * PI * cast(float64) clamped_cutoff / cast(float64) sample_rate;
     sine_value := sin(angular_frequency);
     cosine_value := cos(angular_frequency);
     alpha := sine_value / (2.0 * quality_factor);
+
+    amplification := pow(10.0, cast(float64) gain_decibels / 40.0);
+    two_sqrt_amplification_alpha := 2.0 * sqrt(amplification) * alpha;
 
     raw_b0: float64 = 0.0;
     raw_b1: float64 = 0.0;
@@ -552,6 +559,35 @@ calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_her
             raw_b0 = alpha;
             raw_b1 = 0.0;
             raw_b2 = -alpha;
+
+        case .NOTCH;
+            raw_b0 = 1.0;
+            raw_b1 = -2.0 * cosine_value;
+            raw_b2 = 1.0;
+
+        case .PEAKING;
+            raw_b0 = 1.0 + alpha * amplification;
+            raw_b1 = -2.0 * cosine_value;
+            raw_b2 = 1.0 - alpha * amplification;
+            raw_a0 = 1.0 + alpha / amplification;
+            raw_a1 = -2.0 * cosine_value;
+            raw_a2 = 1.0 - alpha / amplification;
+
+        case .LOW_SHELF;
+            raw_b0 = amplification * ((amplification + 1.0) - (amplification - 1.0) * cosine_value + two_sqrt_amplification_alpha);
+            raw_b1 = 2.0 * amplification * ((amplification - 1.0) - (amplification + 1.0) * cosine_value);
+            raw_b2 = amplification * ((amplification + 1.0) - (amplification - 1.0) * cosine_value - two_sqrt_amplification_alpha);
+            raw_a0 = (amplification + 1.0) + (amplification - 1.0) * cosine_value + two_sqrt_amplification_alpha;
+            raw_a1 = -2.0 * ((amplification - 1.0) + (amplification + 1.0) * cosine_value);
+            raw_a2 = (amplification + 1.0) + (amplification - 1.0) * cosine_value - two_sqrt_amplification_alpha;
+
+        case .HIGH_SHELF;
+            raw_b0 = amplification * ((amplification + 1.0) + (amplification - 1.0) * cosine_value + two_sqrt_amplification_alpha);
+            raw_b1 = -2.0 * amplification * ((amplification - 1.0) + (amplification + 1.0) * cosine_value);
+            raw_b2 = amplification * ((amplification + 1.0) + (amplification - 1.0) * cosine_value - two_sqrt_amplification_alpha);
+            raw_a0 = (amplification + 1.0) - (amplification - 1.0) * cosine_value + two_sqrt_amplification_alpha;
+            raw_a1 = 2.0 * ((amplification - 1.0) - (amplification + 1.0) * cosine_value);
+            raw_a2 = (amplification + 1.0) - (amplification - 1.0) * cosine_value - two_sqrt_amplification_alpha;
 
         case;
             return coefficients;

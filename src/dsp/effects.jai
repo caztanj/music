@@ -513,6 +513,101 @@ process_studio_reverb :: (reverb: *Studio_Reverb, input_left: float, input_right
     return output_left, output_right;
 }
 
+initialize_equalizer_band :: (band: *Equalizer_Band, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+    band.filter_type = .NONE;
+    band.frequency_hertz = 1000.0;
+    band.gain_decibels = 0.0;
+    band.quality_factor = 0.707;
+    band.left_state_1 = 0.0;
+    band.left_state_2 = 0.0;
+    band.right_state_1 = 0.0;
+    band.right_state_2 = 0.0;
+    band.coefficients = calculate_biquad_coefficients(.NONE, 1000.0, 0.0, sample_rate);
+}
+
+configure_equalizer_band :: (band: *Equalizer_Band, filter_type: Filter_Type, frequency_hertz: float, gain_decibels: float, quality_factor: float, sample_rate: s64) {
+    band.filter_type = filter_type;
+    band.frequency_hertz = frequency_hertz;
+    band.gain_decibels = gain_decibels;
+    band.quality_factor = quality_factor;
+
+    band.coefficients = calculate_biquad_coefficients(
+        filter_type = filter_type,
+        cutoff_frequency_hertz = frequency_hertz,
+        resonance = 0.0,
+        sample_rate = sample_rate,
+        gain_decibels = gain_decibels,
+        quality_factor_override = quality_factor
+    );
+}
+
+reset_equalizer_band :: (band: *Equalizer_Band) {
+    band.left_state_1 = 0.0;
+    band.left_state_2 = 0.0;
+    band.right_state_1 = 0.0;
+    band.right_state_2 = 0.0;
+}
+
+process_equalizer_band :: (band: *Equalizer_Band, input_left: float, input_right: float) -> float, float {
+    if band.filter_type == .NONE || band.gain_decibels == 0.0 {
+        return input_left, input_right;
+    }
+
+    output_left := process_biquad_filter(band.coefficients, input_left, *band.left_state_1, *band.left_state_2);
+    output_right := process_biquad_filter(band.coefficients, input_right, *band.right_state_1, *band.right_state_2);
+
+    return output_left, output_right;
+}
+
+initialize_parametric_equalizer :: (equalizer: *Parametric_Equalizer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+    equalizer.sample_rate = sample_rate;
+    equalizer.enabled = false;
+
+    initialize_equalizer_band(*equalizer.low_band, sample_rate);
+    initialize_equalizer_band(*equalizer.mid_band, sample_rate);
+    initialize_equalizer_band(*equalizer.high_band, sample_rate);
+
+    configure_parametric_equalizer(equalizer, 0.0, 0.0, 0.0, 120.0, 1200.0, 1.0, 8000.0);
+}
+
+configure_parametric_equalizer :: (
+    equalizer: *Parametric_Equalizer,
+    low_gain_decibels: float,
+    mid_gain_decibels: float,
+    high_gain_decibels: float,
+    low_frequency_hertz: float = 120.0,
+    mid_frequency_hertz: float = 1200.0,
+    mid_quality_factor: float = 1.0,
+    high_frequency_hertz: float = 8000.0
+) {
+    configure_equalizer_band(*equalizer.low_band, .LOW_SHELF, low_frequency_hertz, low_gain_decibels, 0.707, equalizer.sample_rate);
+    configure_equalizer_band(*equalizer.mid_band, .PEAKING, mid_frequency_hertz, mid_gain_decibels, mid_quality_factor, equalizer.sample_rate);
+    configure_equalizer_band(*equalizer.high_band, .HIGH_SHELF, high_frequency_hertz, high_gain_decibels, 0.707, equalizer.sample_rate);
+
+    equalizer.enabled = (low_gain_decibels != 0.0) || (mid_gain_decibels != 0.0) || (high_gain_decibels != 0.0);
+}
+
+reset_parametric_equalizer :: (equalizer: *Parametric_Equalizer) {
+    reset_equalizer_band(*equalizer.low_band);
+    reset_equalizer_band(*equalizer.mid_band);
+    reset_equalizer_band(*equalizer.high_band);
+}
+
+process_parametric_equalizer :: (equalizer: *Parametric_Equalizer, input_left: float, input_right: float) -> float, float {
+    if !equalizer.enabled {
+        return input_left, input_right;
+    }
+
+    current_left := input_left;
+    current_right := input_right;
+
+    current_left, current_right = process_equalizer_band(*equalizer.low_band, current_left, current_right);
+    current_left, current_right = process_equalizer_band(*equalizer.mid_band, current_left, current_right);
+    current_left, current_right = process_equalizer_band(*equalizer.high_band, current_left, current_right);
+
+    return current_left, current_right;
+}
+
 MAXIMUM_DELAY_FRAMES :: 96000;
 MAXIMUM_PREDELAY_FRAMES :: 24000;
 REVERB_COMB_COUNT :: 8;
@@ -582,5 +677,25 @@ Master_Limiter :: struct {
     ceiling_linear: float = 0.98855;
     release_multiplier: float = 0.999;
     envelope_follower: float = 0.0;
+    sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+}
+
+Equalizer_Band :: struct {
+    filter_type: Filter_Type = .NONE;
+    frequency_hertz: float = 1000.0;
+    gain_decibels: float = 0.0;
+    quality_factor: float = 0.707;
+    coefficients: Biquad_Coefficients;
+    left_state_1: float = 0.0;
+    left_state_2: float = 0.0;
+    right_state_1: float = 0.0;
+    right_state_2: float = 0.0;
+}
+
+Parametric_Equalizer :: struct {
+    enabled: bool = false;
+    low_band: Equalizer_Band;
+    mid_band: Equalizer_Band;
+    high_band: Equalizer_Band;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
 }
