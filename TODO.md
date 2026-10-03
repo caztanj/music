@@ -24,9 +24,9 @@
 - [x] **10.2 Stereo Unison & Hyper-Detune**
   - [x] Polyphonic voice stacking (2, 4, 8 unison voices per note).
   - [x] Configurable stereo spread and detune amount for classic "supersaw" leads and wide reese basses.
-- [ ] **10.3 Dedicated Filter ADSR Envelope**
-  - [ ] Independent 4-stage ADSR envelope controlling filter cutoff frequency over time.
-  - [ ] Envelope modulation amount (bipolar: -100% to +100%) for classic synth brass, plucks, and squelchy bass.
+- [x] **10.3 Dedicated Filter ADSR Envelope**
+  - [x] Independent 4-stage ADSR envelope controlling filter cutoff frequency over time.
+  - [x] Envelope modulation amount (bipolar: -100% to +100%) for classic synth brass, plucks, and squelchy bass.
 - [ ] **10.4 Low Frequency Oscillators (LFOs)**
   - [ ] Dual LFOs with Sine, Triangle, Square, and Random (Sample & Hold) waveforms.
   - [ ] Tempo sync modes (e.g. 1/1, 1/2, 1/4, 1/8, 1/16, triplets) or free Hertz rate.

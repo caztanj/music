@@ -322,4 +322,108 @@ synth_tests :: () {
         expect_near(instrument.synthesizer.unison_detune, 25.0, 0.001);
         expect_near(instrument.synthesizer.unison_spread, 0.85, 0.001);
     });
+
+    test("filter_envelope_modulates_cutoff_dynamically", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.filter.type = .LOWPASS;
+        configuration.filter.cutoff_frequency_hertz = 150.0;
+        configuration.filter.resonance = 0.2;
+        configuration.filter.envelope_amount = 0.8;
+        configuration.filter.envelope.attack_milliseconds = 2.0;
+        configuration.filter.envelope.decay_milliseconds = 15.0;
+        configuration.filter.envelope.sustain_level = 0.0;
+        configuration.filter.envelope.release_milliseconds = 10.0;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 100.0;
+        configuration.envelope.sustain_level = 1.0;
+        configuration.envelope.release_milliseconds = 100.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        peak_derivative_energy: float = 0.0;
+        settled_derivative_energy: float = 0.0;
+        previous_sample: float = 0.0;
+
+        while sample_index < 2000 {
+            current_sample := render_synthesizer_sample(*voice);
+            derivative := current_sample - previous_sample;
+            previous_sample = current_sample;
+
+            if sample_index >= 80 && sample_index < 200 {
+                peak_derivative_energy += derivative * derivative;
+            } else if sample_index >= 1200 && sample_index < 1320 {
+                settled_derivative_energy += derivative * derivative;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(peak_derivative_energy > settled_derivative_energy * 2.0);
+    });
+
+    test("filter_envelope_bipolar_negative_modulation", () {
+        positive_configuration: Synthesizer_Configuration;
+        positive_configuration.waveform = .SAWTOOTH;
+        positive_configuration.filter.type = .LOWPASS;
+        positive_configuration.filter.cutoff_frequency_hertz = 1000.0;
+        positive_configuration.filter.envelope_amount = 0.7;
+        positive_configuration.filter.envelope.attack_milliseconds = 1.0;
+        positive_configuration.filter.envelope.decay_milliseconds = 50.0;
+        positive_configuration.filter.envelope.sustain_level = 1.0;
+        positive_configuration.filter.envelope.release_milliseconds = 50.0;
+        positive_configuration.envelope.attack_milliseconds = 1.0;
+        positive_configuration.envelope.decay_milliseconds = 50.0;
+        positive_configuration.envelope.sustain_level = 1.0;
+        positive_configuration.envelope.release_milliseconds = 50.0;
+
+        negative_configuration := positive_configuration;
+        negative_configuration.filter.envelope_amount = -0.7;
+
+        positive_voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*positive_voice, positive_configuration, 44100);
+        trigger_synthesizer_note_on(*positive_voice, 60, 1.0);
+
+        negative_voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*negative_voice, negative_configuration, 44100);
+        trigger_synthesizer_note_on(*negative_voice, 60, 1.0);
+
+        sample_index := 0;
+        positive_energy: float = 0.0;
+        negative_energy: float = 0.0;
+
+        while sample_index < 800 {
+            positive_sample := render_synthesizer_sample(*positive_voice);
+            negative_sample := render_synthesizer_sample(*negative_voice);
+            if sample_index >= 150 {
+                positive_energy += positive_sample * positive_sample;
+                negative_energy += negative_sample * negative_sample;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(positive_energy > negative_energy * 2.0);
+    });
+
+    test("synthesizer_parser_filter_envelope_arguments", () {
+        song_text := "[project]\nname = \"Filter Env Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\npluck = synth(wave=\"saw\", filter=\"lowpass\", cutoff=400, res=0.35, env_amount=0.75, filter_attack=5, filter_decay=80, filter_sustain=0.2, filter_release=120)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\npluck -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        instrument, instrument_found := find_instrument(*specification, "pluck");
+        expect_true(instrument_found);
+        expect_equals(instrument.synthesizer.filter.type, Filter_Type.LOWPASS);
+        expect_near(instrument.synthesizer.filter.cutoff_frequency_hertz, 400.0, 0.001);
+        expect_near(instrument.synthesizer.filter.resonance, 0.35, 0.001);
+        expect_near(instrument.synthesizer.filter.envelope_amount, 0.75, 0.001);
+        expect_near(instrument.synthesizer.filter.envelope.attack_milliseconds, 5.0, 0.001);
+        expect_near(instrument.synthesizer.filter.envelope.decay_milliseconds, 80.0, 0.001);
+        expect_near(instrument.synthesizer.filter.envelope.sustain_level, 0.2, 0.001);
+        expect_near(instrument.synthesizer.filter.envelope.release_milliseconds, 120.0, 0.001);
+    });
 }

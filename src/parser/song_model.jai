@@ -190,17 +190,19 @@ Project_Configuration :: struct {
     location: Source_Location;
 }
 
-Filter_Configuration :: struct {
-    type: Filter_Type = .NONE;
-    cutoff_frequency_hertz: float = 20000.0;
-    resonance: float = 0.0;
-}
-
 Envelope_Configuration :: struct {
     attack_milliseconds: float = 10.0;
     decay_milliseconds: float = 100.0;
     sustain_level: float = 0.7;
     release_milliseconds: float = 100.0;
+}
+
+Filter_Configuration :: struct {
+    type: Filter_Type = .NONE;
+    cutoff_frequency_hertz: float = 20000.0;
+    resonance: float = 0.0;
+    envelope_amount: float = 0.0;
+    envelope: Envelope_Configuration;
 }
 
 Sampler_Configuration :: struct {

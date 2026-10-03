@@ -374,6 +374,26 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
             release_value, release_success := parse_number(parser);
             if !release_success return false;
             synthesizer_configuration.envelope.release_milliseconds = cast(float) release_value;
+        } else if parameter_name == "filter_envelope_amount" || parameter_name == "filter_env_amount" || parameter_name == "env_amount" {
+            amount_value, amount_success := parse_number(parser);
+            if !amount_success return false;
+            synthesizer_configuration.filter.envelope_amount = cast(float) amount_value;
+        } else if parameter_name == "filter_attack" || parameter_name == "filter_envelope_attack" {
+            attack_value, attack_success := parse_number(parser);
+            if !attack_success return false;
+            synthesizer_configuration.filter.envelope.attack_milliseconds = cast(float) attack_value;
+        } else if parameter_name == "filter_decay" || parameter_name == "filter_envelope_decay" {
+            decay_value, decay_success := parse_number(parser);
+            if !decay_success return false;
+            synthesizer_configuration.filter.envelope.decay_milliseconds = cast(float) decay_value;
+        } else if parameter_name == "filter_sustain" || parameter_name == "filter_envelope_sustain" {
+            sustain_value, sustain_success := parse_number(parser);
+            if !sustain_success return false;
+            synthesizer_configuration.filter.envelope.sustain_level = cast(float) sustain_value;
+        } else if parameter_name == "filter_release" || parameter_name == "filter_envelope_release" {
+            release_value, release_success := parse_number(parser);
+            if !release_success return false;
+            synthesizer_configuration.filter.envelope.release_milliseconds = cast(float) release_value;
         } else if parameter_name == "wave2" || parameter_name == "waveform2" || parameter_name == "osc2_wave" || parameter_name == "osc2" {
             wave_token := current_token(parser);
             wave_name := ifx wave_token.type == .STRING then wave_token.string_value else wave_token.text;

@@ -21,6 +21,7 @@ initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synth
     }
 
     configure_envelope(*voice.amplitude_envelope, configuration.envelope, sample_rate);
+    configure_envelope(*voice.filter_envelope, configuration.filter.envelope, sample_rate);
 }
 
 trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32, velocity: float = 1.0) {
@@ -44,10 +45,12 @@ trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32
     voice.oscillator_2_phase = voice.unison_oscillator_2_phases[0];
 
     trigger_attack(*voice.amplitude_envelope);
+    trigger_attack(*voice.filter_envelope);
 }
 
 trigger_synthesizer_note_off :: (voice: *Synthesizer_Voice) {
     trigger_release(*voice.amplitude_envelope);
+    trigger_release(*voice.filter_envelope);
 }
 
 reset_synthesizer_voice :: (voice: *Synthesizer_Voice) {
@@ -70,6 +73,7 @@ reset_synthesizer_voice :: (voice: *Synthesizer_Voice) {
     }
 
     reset_envelope(*voice.amplitude_envelope);
+    reset_envelope(*voice.filter_envelope);
 }
 
 is_synthesizer_voice_active :: (voice: *Synthesizer_Voice) -> bool {
@@ -121,6 +125,8 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
 
         return 0.0, 0.0;
     }
+
+    filter_envelope_level := process_envelope_sample(*voice.filter_envelope);
 
     unison_voice_count := voice.configuration.unison_voices;
     if unison_voice_count < 1 {
@@ -237,9 +243,25 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
     right_filtered := right_oscillator;
 
     if voice.configuration.filter.type != .NONE {
+        effective_cutoff := voice.configuration.filter.cutoff_frequency_hertz;
+        if voice.configuration.filter.envelope_amount != 0.0 {
+            modulation_amount := voice.configuration.filter.envelope_amount;
+            if modulation_amount > 1.0 || modulation_amount < -1.0 {
+                modulation_amount /= 100.0;
+            }
+
+            octave_range := 5.0;
+            cutoff_multiplier := cast(float) pow(2.0, cast(float64) (filter_envelope_level * modulation_amount * octave_range));
+            effective_cutoff *= cutoff_multiplier;
+        }
+
+        if effective_cutoff < 60.0 {
+            effective_cutoff = 60.0;
+        }
+
         coefficients := calculate_biquad_coefficients(
             voice.configuration.filter.type,
-            voice.configuration.filter.cutoff_frequency_hertz,
+            effective_cutoff,
             voice.configuration.filter.resonance,
             voice.sample_rate
         );
@@ -414,8 +436,26 @@ calculate_biquad_coefficients :: (filter_type: Filter_Type, cutoff_frequency_her
 process_biquad_filter :: (coefficients: Biquad_Coefficients, input_sample: float, state_1: *float, state_2: *float) -> float {
     output_sample := coefficients.b0 * input_sample + state_1.*;
 
+    if output_sample > 2.0 {
+        output_sample = 2.0;
+    } else if output_sample < -2.0 {
+        output_sample = -2.0;
+    }
+
     state_1.* = coefficients.b1 * input_sample - coefficients.a1 * output_sample + state_2.*;
     state_2.* = coefficients.b2 * input_sample - coefficients.a2 * output_sample;
+
+    if state_1.* > 2.0 {
+        state_1.* = 2.0;
+    } else if state_1.* < -2.0 {
+        state_1.* = -2.0;
+    }
+
+    if state_2.* > 2.0 {
+        state_2.* = 2.0;
+    } else if state_2.* < -2.0 {
+        state_2.* = -2.0;
+    }
 
     if abs(state_1.*) < 0.000000000000001 {
         state_1.* = 0.0;
@@ -448,6 +488,7 @@ Synthesizer_Voice :: struct {
     midi_note_number: s32 = 60;
     velocity: float = 1.0;
     amplitude_envelope: Envelope_Generator;
+    filter_envelope: Envelope_Generator;
     filter_state_1: float = 0.0;
     filter_state_2: float = 0.0;
     filter_right_state_1: float = 0.0;
