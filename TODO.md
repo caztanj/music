@@ -65,9 +65,9 @@
 - [x] **12.1 Dynamic Peak/RMS Compressor (`src/engine/mixer.jai`, `src/dsp/effects.jai`)**
   - [x] Threshold (-60 to 0 dB), Ratio (1:1 to 20:1 / $\infty$), Attack time (0.1–100 ms), Release time (10–1000 ms).
   - [x] Soft-knee transition curve and automated or manual makeup gain.
-- [ ] **12.2 Sidechain Ducking Engine**
-  - [ ] Allow any mixer track to receive sidechain detection signals from another track (e.g. Kick $\to$ Bass, Kick $\to$ Pads).
-  - [ ] Instant envelope follower with adjustable ducking depth and release timing for rhythmic pumping.
+- [x] **12.2 Sidechain Ducking Engine**
+  - [x] Allow any mixer track to receive sidechain detection signals from another track (e.g. Kick $\to$ Bass, Kick $\to$ Pads).
+  - [x] Instant envelope follower with adjustable ducking depth and release timing for rhythmic pumping.
 - [ ] **12.3 Aux Send / Return Busses**
   - [ ] Dedicated Return tracks (e.g. Aux 1: Master Reverb, Aux 2: Ping-Pong Delay).
   - [ ] Post-fader / Pre-fader send level knobs per mixer channel strip.

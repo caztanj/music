@@ -885,6 +885,7 @@ initialize_dynamic_compressor :: (compressor: *Dynamic_Compressor, sample_rate: 
     compressor.knee_decibels = 6.0;
     compressor.makeup_gain_decibels = 0.0;
     compressor.mix = 1.0;
+    compressor.ducking_depth_decibels = 0.0;
     compressor.envelope_decibels = 0.0;
 
     calculate_compressor_coefficients(compressor);
@@ -898,7 +899,8 @@ configure_dynamic_compressor :: (
     release_milliseconds: float = 100.0,
     knee_decibels: float = 6.0,
     makeup_gain_decibels: float = 0.0,
-    mix: float = 1.0
+    mix: float = 1.0,
+    ducking_depth_decibels: float = 0.0
 ) {
     compressor.threshold_decibels = threshold_decibels;
     if compressor.threshold_decibels < -60.0 {
@@ -949,7 +951,14 @@ configure_dynamic_compressor :: (
         compressor.mix = 1.0;
     }
 
-    compressor.enabled = (compressor.ratio > 1.0 || compressor.makeup_gain_decibels != 0.0) && (compressor.mix > 0.0);
+    compressor.ducking_depth_decibels = ducking_depth_decibels;
+    if compressor.ducking_depth_decibels < 0.0 {
+        compressor.ducking_depth_decibels = 0.0;
+    } else if compressor.ducking_depth_decibels > 60.0 {
+        compressor.ducking_depth_decibels = 60.0;
+    }
+
+    compressor.enabled = (compressor.ratio > 1.0 || compressor.makeup_gain_decibels != 0.0 || compressor.ducking_depth_decibels > 0.0) && (compressor.mix > 0.0);
 
     calculate_compressor_coefficients(compressor);
 }
@@ -1010,6 +1019,12 @@ process_dynamic_compressor :: (
             target_gain_reduction_decibels = slope_factor * (normalized_knee * normalized_knee) / (2.0 * compressor.knee_decibels);
         } else if overshoot >= half_knee {
             target_gain_reduction_decibels = slope_factor * overshoot;
+        }
+    }
+
+    if compressor.ducking_depth_decibels > 0.0 {
+        if target_gain_reduction_decibels < -compressor.ducking_depth_decibels {
+            target_gain_reduction_decibels = -compressor.ducking_depth_decibels;
         }
     }
 
@@ -1155,6 +1170,7 @@ Dynamic_Compressor :: struct {
     knee_decibels: float = 6.0;
     makeup_gain_decibels: float = 0.0;
     mix: float = 1.0;
+    ducking_depth_decibels: float = 0.0;
     envelope_decibels: float = 0.0;
     attack_coefficient: float = 0.0;
     release_coefficient: float = 0.0;

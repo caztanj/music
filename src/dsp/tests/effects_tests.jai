@@ -587,4 +587,136 @@ effects_tests :: () {
         expect_near(mixer.master.compressor.attack_milliseconds, 20.0, 0.001);
         expect_near(mixer.master.compressor.release_milliseconds, 150.0, 0.001);
     });
+
+    test("compressor_sidechain_ducking", () {
+        compressor: Dynamic_Compressor;
+        initialize_dynamic_compressor(*compressor, 44100);
+        configure_dynamic_compressor(
+            *compressor,
+            threshold_decibels = -20.0,
+            ratio = 20.0,
+            attack_milliseconds = 1.0,
+            release_milliseconds = 50.0,
+            knee_decibels = 0.0,
+            makeup_gain_decibels = 0.0,
+            mix = 1.0,
+            ducking_depth_decibels = 12.0
+        );
+
+        bass_sample: float = 0.8;
+        sample_index := 0;
+        while sample_index < 100 {
+            output_left, output_right := process_dynamic_compressor(*compressor, bass_sample, bass_sample, sidechain_left = 0.0, sidechain_right = 0.0, use_sidechain = true);
+            expect_near(output_left, bass_sample, 0.001);
+            expect_near(output_right, bass_sample, 0.001);
+            sample_index += 1;
+        }
+
+        sample_index = 0;
+        ducked_left: float = 0.0;
+        ducked_right: float = 0.0;
+        while sample_index < 300 {
+            ducked_left, ducked_right = process_dynamic_compressor(*compressor, bass_sample, bass_sample, sidechain_left = 1.0, sidechain_right = 1.0, use_sidechain = true);
+            sample_index += 1;
+        }
+
+        expect_near(compressor.envelope_decibels, -12.0, 0.1);
+        expected_ducked_sample := bass_sample * decibels_to_linear(-12.0);
+        expect_near(ducked_left, expected_ducked_sample, 0.01);
+        expect_near(ducked_right, expected_ducked_sample, 0.01);
+        expect_true(ducked_left < 0.25);
+
+        sample_index = 0;
+        recovered_left: float = 0.0;
+        while sample_index < 12000 {
+            recovered_left, _ = process_dynamic_compressor(*compressor, bass_sample, bass_sample, sidechain_left = 0.0, sidechain_right = 0.0, use_sidechain = true);
+            sample_index += 1;
+        }
+
+        expect_true(compressor.envelope_decibels > -0.5);
+        expect_near(recovered_left, bass_sample, 0.05);
+
+        mixer: Mixer;
+        initialize_mixer(*mixer, 44100);
+        defer deinitialize_mixer(*mixer);
+
+        channel_1 := *mixer.tracks[0];
+        channel_2 := *mixer.tracks[1];
+
+        channel_2.sidechain_source_track_index = 1;
+        channel_2.compressor_enabled = true;
+        configure_dynamic_compressor(
+            *channel_2.compressor,
+            threshold_decibels = -24.0,
+            ratio = 20.0,
+            attack_milliseconds = 1.0,
+            release_milliseconds = 50.0,
+            knee_decibels = 0.0,
+            makeup_gain_decibels = 0.0,
+            mix = 1.0,
+            ducking_depth_decibels = 10.0
+        );
+
+        frame_index := 0;
+        while frame_index < 256 {
+            channel_1.left_buffer[frame_index] = 1.0;
+            channel_1.right_buffer[frame_index] = 1.0;
+            channel_2.left_buffer[frame_index] = 0.8;
+            channel_2.right_buffer[frame_index] = 0.8;
+            frame_index += 1;
+        }
+
+        mix_channels_to_master(*mixer, 256);
+
+        pan_factor := cast(float) cos(0.25 * PI);
+        kick_expected_master := 1.0 * pan_factor;
+        ducked_bass_gain := decibels_to_linear(channel_2.compressor.envelope_decibels);
+        expected_ducked_bass_master := 0.8 * ducked_bass_gain * pan_factor;
+        expected_combined := kick_expected_master + expected_ducked_bass_master;
+
+        expect_near(channel_2.compressor.envelope_decibels, -10.0, 0.1);
+        expect_near(mixer.master.left_buffer[250], expected_combined, 0.02);
+    });
+
+    test("mixer_parser_sidechain_arguments", () {
+        song_text := "[project]\nname = \"Sidechain Ducking Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nkick = sampler(\"samples/kick.wav\")\nbass = synth(wave=\"saw\")\nsynth_lead = synth(wave=\"square\")\npad = synth(wave=\"sine\")\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1 (drums): gain = 0.95, output = master\ntrack 2 (bass): gain = 0.90, sidechain = 1, ducking_depth = 12 db, comp_attack = 2.0, comp_release = 120.0, output = master\ntrack 3 (synth): gain = 0.80, sidechain = drums, ducking_depth = 8 db, output = master\ntrack 4 (pad): gain = 0.70, sidechain = kick, ducking_depth = 6 db, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nkick -> track 1\nbass -> track 2\nsynth_lead -> track 3\npad -> track 4\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        track_2 := *specification.mixer.tracks[1];
+        expect_equals(track_2.sidechain_source_track_index, 1);
+        expect_true(track_2.compressor_enabled);
+        expect_near(track_2.sidechain_depth_decibels, 12.0, 0.001);
+        expect_near(track_2.compressor_attack_milliseconds, 2.0, 0.001);
+        expect_near(track_2.compressor_release_milliseconds, 120.0, 0.001);
+
+        track_3 := *specification.mixer.tracks[2];
+        expect_equals(track_3.sidechain_source_track_index, 1);
+        expect_true(track_3.compressor_enabled);
+        expect_near(track_3.sidechain_depth_decibels, 8.0, 0.001);
+
+        track_4 := *specification.mixer.tracks[3];
+        expect_equals(track_4.sidechain_source_track_index, 1);
+        expect_true(track_4.compressor_enabled);
+        expect_near(track_4.sidechain_depth_decibels, 6.0, 0.001);
+
+        mixer: Mixer;
+        configure_mixer_from_definition(*mixer, specification.mixer, 44100, 120.0);
+        defer deinitialize_mixer(*mixer);
+
+        expect_equals(mixer.tracks[1].sidechain_source_track_index, 1);
+        expect_true(mixer.tracks[1].compressor_enabled);
+        expect_near(mixer.tracks[1].compressor.ducking_depth_decibels, 12.0, 0.001);
+        expect_near(mixer.tracks[1].compressor.attack_milliseconds, 2.0, 0.001);
+        expect_near(mixer.tracks[1].compressor.release_milliseconds, 120.0, 0.001);
+
+        expect_equals(mixer.tracks[2].sidechain_source_track_index, 1);
+        expect_true(mixer.tracks[2].compressor_enabled);
+        expect_near(mixer.tracks[2].compressor.ducking_depth_decibels, 8.0, 0.001);
+
+        expect_equals(mixer.tracks[3].sidechain_source_track_index, 1);
+        expect_true(mixer.tracks[3].compressor_enabled);
+        expect_near(mixer.tracks[3].compressor.ducking_depth_decibels, 6.0, 0.001);
+    });
 }

@@ -955,27 +955,30 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
                 track.compressor_threshold_decibels = cast(float) threshold_value;
                 track.compressor_enabled = true;
             }
-        } else if parameter_name == "comp_threshold" || parameter_name == "compressor_threshold" || parameter_name == "threshold" {
+        } else if parameter_name == "comp_threshold" || parameter_name == "compressor_threshold" || parameter_name == "threshold" || parameter_name == "sidechain_threshold" || parameter_name == "ducking_threshold" {
             threshold_value, threshold_success := parse_number(parser);
             if !threshold_success return false;
             track.compressor_threshold_decibels = cast(float) threshold_value;
+            track.compressor_threshold_set = true;
             track.compressor_enabled = true;
-        } else if parameter_name == "comp_ratio" || parameter_name == "compressor_ratio" || parameter_name == "ratio" {
+        } else if parameter_name == "comp_ratio" || parameter_name == "compressor_ratio" || parameter_name == "ratio" || parameter_name == "sidechain_ratio" || parameter_name == "ducking_ratio" {
             ratio_value, ratio_success := parse_number(parser);
             if !ratio_success return false;
             track.compressor_ratio = cast(float) ratio_value;
+            track.compressor_ratio_set = true;
             track.compressor_enabled = true;
-        } else if parameter_name == "comp_attack" || parameter_name == "compressor_attack" || parameter_name == "attack" {
+        } else if parameter_name == "comp_attack" || parameter_name == "compressor_attack" || parameter_name == "attack" || parameter_name == "sidechain_attack" || parameter_name == "ducking_attack" || parameter_name == "duck_attack" {
             attack_value, attack_success := parse_number(parser);
             if !attack_success return false;
             track.compressor_attack_milliseconds = cast(float) attack_value;
+            track.compressor_attack_set = true;
             track.compressor_enabled = true;
-        } else if parameter_name == "comp_release" || parameter_name == "compressor_release" || parameter_name == "release" {
+        } else if parameter_name == "comp_release" || parameter_name == "compressor_release" || parameter_name == "release" || parameter_name == "sidechain_release" || parameter_name == "ducking_release" || parameter_name == "duck_release" {
             release_value, release_success := parse_number(parser);
             if !release_success return false;
             track.compressor_release_milliseconds = cast(float) release_value;
             track.compressor_enabled = true;
-        } else if parameter_name == "comp_knee" || parameter_name == "compressor_knee" || parameter_name == "knee" {
+        } else if parameter_name == "comp_knee" || parameter_name == "compressor_knee" || parameter_name == "knee" || parameter_name == "sidechain_knee" || parameter_name == "ducking_knee" {
             knee_value, knee_success := parse_number(parser);
             if !knee_success return false;
             track.compressor_knee_decibels = cast(float) knee_value;
@@ -990,6 +993,52 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if !mix_success return false;
             track.compressor_mix = cast(float) mix_value;
             track.compressor_enabled = true;
+        } else if parameter_name == "sidechain" || parameter_name == "sidechain_source" || parameter_name == "sidechain_track" || parameter_name == "duck_from" {
+            source_token := current_token(parser);
+            if source_token.type == .INTEGER {
+                track.sidechain_source_track_index = source_token.integer_value;
+                track.compressor_enabled = true;
+                advance_token(parser);
+            } else if source_token.type == .IDENTIFIER || source_token.type == .STRING {
+                source_text := ifx source_token.type == .STRING then source_token.string_value else source_token.text;
+                if source_text == "none" || source_text == "off" {
+                    track.sidechain_source_track_index = 0;
+                    track.sidechain_source_name = "";
+                    advance_token(parser);
+                } else if source_text == "track" {
+                    advance_token(parser);
+                    track_index_token, track_index_success := consume_token(parser, .INTEGER, "Expected track index number after 'track'");
+                    if !track_index_success return false;
+                    track.sidechain_source_track_index = track_index_token.integer_value;
+                    track.compressor_enabled = true;
+                } else {
+                    track.sidechain_source_name = source_text;
+                    track.compressor_enabled = true;
+                    advance_token(parser);
+                }
+            } else {
+                set_error(parser, source_token.location, "Expected track number or name for sidechain");
+                return false;
+            }
+        } else if parameter_name == "ducking_depth" || parameter_name == "sidechain_depth" || parameter_name == "duck_depth" {
+            depth_value, depth_success := parse_number(parser);
+            if !depth_success return false;
+            track.sidechain_depth_decibels = cast(float) abs(depth_value);
+            track.compressor_enabled = true;
+            if !track.compressor_threshold_set {
+                track.compressor_threshold_decibels = -24.0;
+            }
+            if !track.compressor_ratio_set {
+                track.compressor_ratio = 20.0;
+            }
+            if !track.compressor_attack_set {
+                track.compressor_attack_milliseconds = 2.0;
+            }
+
+            unit_token := current_token(parser);
+            if unit_token.type == .IDENTIFIER && (unit_token.text == "db" || unit_token.text == "decibels") {
+                advance_token(parser);
+            }
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -1406,6 +1455,53 @@ validate_song_specification :: (parser: *Parser, song_specification: *Song_Speci
 
             instrument_index += 1;
         }
+    }
+
+    mixer_track_index := 0;
+    while mixer_track_index < song_specification.mixer.tracks.count {
+        track := *song_specification.mixer.tracks[mixer_track_index];
+        if track.sidechain_source_name.count > 0 && track.sidechain_source_track_index == 0 {
+            resolved := false;
+            other_index := 0;
+            while other_index < song_specification.mixer.tracks.count {
+                other_track := *song_specification.mixer.tracks[other_index];
+                if other_track.name == track.sidechain_source_name {
+                    track.sidechain_source_track_index = other_track.track_index;
+                    resolved = true;
+                    break;
+                }
+
+                other_index += 1;
+            }
+
+            if !resolved {
+                routing_search_index := 0;
+                while routing_search_index < song_specification.routings.count {
+                    routing := *song_specification.routings[routing_search_index];
+                    if routing.instrument_name == track.sidechain_source_name {
+                        track.sidechain_source_track_index = routing.track_index;
+                        resolved = true;
+                        break;
+                    }
+
+                    routing_search_index += 1;
+                }
+            }
+
+            if !resolved {
+                set_error(parser, track.location, sprint("Sidechain source '%' not found in mixer tracks or routings", track.sidechain_source_name));
+                return false;
+            }
+        }
+
+        if track.sidechain_source_track_index > 0 {
+            if track.sidechain_source_track_index < 1 || track.sidechain_source_track_index > 16 {
+                set_error(parser, track.location, sprint("Invalid sidechain track index %", track.sidechain_source_track_index));
+                return false;
+            }
+        }
+
+        mixer_track_index += 1;
     }
 
     return true;

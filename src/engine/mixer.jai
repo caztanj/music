@@ -12,6 +12,7 @@ initialize_mixer :: (mixer: *Mixer, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
         channel.is_muted = false;
         channel.is_soloed = false;
         channel.output_target = "master";
+        channel.sidechain_source_track_index = 0;
         channel.delay_enabled = false;
         channel.reverb_enabled = false;
         channel.equalizer_enabled = false;
@@ -72,6 +73,19 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
             channel.gain = track_definition.gain;
             channel.pan = track_definition.pan;
             channel.output_target = track_definition.output_target;
+            channel.sidechain_source_track_index = track_definition.sidechain_source_track_index;
+            if channel.sidechain_source_track_index == 0 && track_definition.sidechain_source_name.count > 0 {
+                other_index := 0;
+                while other_index < mixer_definition.tracks.count {
+                    other := *mixer_definition.tracks[other_index];
+                    if other.name == track_definition.sidechain_source_name {
+                        channel.sidechain_source_track_index = other.track_index;
+                        break;
+                    }
+
+                    other_index += 1;
+                }
+            }
 
             if track_definition.delay_time_seconds > 0.0 {
                 channel.delay_enabled = true;
@@ -118,7 +132,7 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                 );
             }
 
-            if track_definition.compressor_enabled {
+            if track_definition.compressor_enabled || channel.sidechain_source_track_index > 0 {
                 channel.compressor_enabled = true;
                 configure_dynamic_compressor(
                     *channel.compressor,
@@ -128,7 +142,8 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                     release_milliseconds = track_definition.compressor_release_milliseconds,
                     knee_decibels = track_definition.compressor_knee_decibels,
                     makeup_gain_decibels = track_definition.compressor_makeup_gain_decibels,
-                    mix = track_definition.compressor_mix
+                    mix = track_definition.compressor_mix,
+                    ducking_depth_decibels = track_definition.sidechain_depth_decibels
                 );
             }
 
@@ -304,6 +319,15 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
             pan_gain_left := cast(float) cos(pan_angle) * channel.gain;
             pan_gain_right := cast(float) sin(pan_angle) * channel.gain;
 
+            has_sidechain := channel.sidechain_source_track_index > 0 &&
+                             channel.sidechain_source_track_index <= MAXIMUM_TRACKS &&
+                             channel.sidechain_source_track_index != (track_index + 1);
+
+            source_channel: *Mixer_Channel = null;
+            if has_sidechain {
+                source_channel = *mixer.tracks[channel.sidechain_source_track_index - 1];
+            }
+
             frame_index := 0;
             while frame_index < clamped_frame_count {
                 left_sample := channel.left_buffer[frame_index];
@@ -314,7 +338,21 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                 }
 
                 if channel.compressor_enabled {
-                    left_sample, right_sample = process_dynamic_compressor(*channel.compressor, left_sample, right_sample);
+                    sidechain_left: float = 0.0;
+                    sidechain_right: float = 0.0;
+                    if has_sidechain && source_channel != null {
+                        sidechain_left = source_channel.left_buffer[frame_index];
+                        sidechain_right = source_channel.right_buffer[frame_index];
+                    }
+
+                    left_sample, right_sample = process_dynamic_compressor(
+                        *channel.compressor,
+                        left_sample,
+                        right_sample,
+                        sidechain_left = sidechain_left,
+                        sidechain_right = sidechain_right,
+                        use_sidechain = has_sidechain
+                    );
                 }
 
                 if channel.saturation_enabled {
@@ -409,6 +447,7 @@ Mixer_Channel :: struct {
     is_muted: bool = false;
     is_soloed: bool = false;
     output_target: string = "master";
+    sidechain_source_track_index: s64 = 0;
     equalizer: Parametric_Equalizer;
     equalizer_enabled: bool = false;
     compressor: Dynamic_Compressor;

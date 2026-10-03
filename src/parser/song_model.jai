@@ -451,6 +451,12 @@ Mixer_Track_Definition :: struct {
     compressor_knee_decibels: float = 6.0;
     compressor_makeup_gain_decibels: float = 0.0;
     compressor_mix: float = 1.0;
+    sidechain_source_track_index: s64 = 0;
+    sidechain_source_name: string;
+    sidechain_depth_decibels: float = 0.0;
+    compressor_threshold_set: bool = false;
+    compressor_ratio_set: bool = false;
+    compressor_attack_set: bool = false;
     output_target: string = "master";
     location: Source_Location;
 }
