@@ -154,6 +154,7 @@ Command_Line_Options :: struct {
 #load "dsp/effects.jai";
 #load "engine/voice_manager.jai";
 #load "engine/mixer.jai";
+#load "engine/sequencer.jai";
 
 #import "Basic";
 #import "Math";

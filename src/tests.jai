@@ -11,6 +11,7 @@ main :: () {
     voice_manager_tests();
     effects_tests();
     mixer_tests();
+    sequencer_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -70,6 +71,7 @@ current_test_failed := false;
 #load "dsp/effects.jai";
 #load "engine/voice_manager.jai";
 #load "engine/mixer.jai";
+#load "engine/sequencer.jai";
 #load "tests/common_tests.jai";
 #load "audio/tests/wav_export_tests.jai";
 #load "audio/tests/audio_backend_tests.jai";
@@ -82,6 +84,7 @@ current_test_failed := false;
 #load "dsp/tests/effects_tests.jai";
 #load "engine/tests/voice_manager_tests.jai";
 #load "engine/tests/mixer_tests.jai";
+#load "engine/tests/sequencer_tests.jai";
 
 #import "Basic";
 #import "Math";

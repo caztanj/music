@@ -138,17 +138,17 @@
 
 > **Goal**: Accurate sample-level scheduling of bars, beats, pattern steps, and timeline arrangements.
 
-- [ ] **6.1 Clock & Timekeeper (`src/engine/sequencer.jai`)**
-  - [ ] Store playhead as a 64-bit unsigned integer (`u64 current_sample`).
-  - [ ] Compute `samples_per_beat = (sample_rate * 60) / bpm`.
-  - [ ] Compute `samples_per_step = samples_per_beat / 4` (for 16th notes).
-- [ ] **6.2 Pattern Sequencer**
-  - [ ] Evaluate 16-step grid hits (`x . . . x . . .`) and trigger note-on events.
-  - [ ] Evaluate piano-roll notes with specific lengths and note-off events.
-- [ ] **6.3 Arrangement Player**
-  - [ ] Map global bar positions to active patterns.
-  - [ ] Seamless timeline looping between `bar 1` and `bar N`.
-  - [ ] Accurate sub-buffer event scheduling (sample offsets inside the current audio block).
+- [x] **6.1 Clock & Timekeeper (`src/engine/sequencer.jai`)**
+  - [x] Store playhead as a 64-bit unsigned integer (`u64 current_sample`).
+  - [x] Compute `samples_per_beat = (sample_rate * 60) / bpm`.
+  - [x] Compute `samples_per_step = samples_per_beat / 4` (for 16th notes).
+- [x] **6.2 Pattern Sequencer**
+  - [x] Evaluate 16-step grid hits (`x . . . x . . .`) and trigger note-on events.
+  - [x] Evaluate piano-roll notes with specific lengths and note-off events.
+- [x] **6.3 Arrangement Player**
+  - [x] Map global bar positions to active patterns.
+  - [x] Seamless timeline looping between `bar 1` and `bar N`.
+  - [x] Accurate sub-buffer event scheduling (sample offsets inside the current audio block).
 
 **Acceptance Criteria**: A multi-bar drum and melody sequence loops with zero audible drift over extended playback.
 
