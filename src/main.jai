@@ -148,6 +148,7 @@ Command_Line_Options :: struct {
 #load "parser/lexer.jai";
 #load "parser/song_model.jai";
 #load "parser/parser.jai";
+#load "dsp/envelope.jai";
 
 #import "Basic";
 #import "Math";

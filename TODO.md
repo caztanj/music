@@ -91,9 +91,10 @@
 
 > **Goal**: Build all sound generation components (sampler, synthesizers, filters, envelopes) and the voice allocator.
 
-- [ ] **4.1 Envelope Generator (`src/dsp/envelope.jai`)**
-  - [ ] Implement ADSR state machine (Attack, Decay, Sustain, Release) computed in sample counts.
-  - [ ] Exponential release curve to prevent abrupt cutoff clicks.
+- [x] **4.1 Envelope Generator (`src/dsp/envelope.jai`)**
+  - [x] Implement ADSR state machine (Attack, Decay, Sustain, Release) computed in sample counts.
+  - [x] Exponential release curve to prevent abrupt cutoff clicks.
+
 - [ ] **4.2 Synthesizer Voice (`src/dsp/synth.jai`)**
   - [ ] Polyphonic oscillator bank: Sawtooth, Square / Pulse, Sine, and Triangle waveforms.
   - [ ] Resonant Biquad Filter (Lowpass, Highpass, Bandpass).
