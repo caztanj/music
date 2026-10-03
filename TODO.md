@@ -95,10 +95,11 @@
   - [x] Implement ADSR state machine (Attack, Decay, Sustain, Release) computed in sample counts.
   - [x] Exponential release curve to prevent abrupt cutoff clicks.
 
-- [ ] **4.2 Synthesizer Voice (`src/dsp/synth.jai`)**
-  - [ ] Polyphonic oscillator bank: Sawtooth, Square / Pulse, Sine, and Triangle waveforms.
-  - [ ] Resonant Biquad Filter (Lowpass, Highpass, Bandpass).
-  - [ ] Envelope modulation connected to amplifier and filter cutoff.
+- [x] **4.2 Synthesizer Voice (`src/dsp/synth.jai`)**
+  - [x] Polyphonic oscillator bank: Sawtooth, Square / Pulse, Sine, and Triangle waveforms.
+  - [x] Resonant Biquad Filter (Lowpass, Highpass, Bandpass).
+  - [x] Envelope modulation connected to amplifier and filter cutoff.
+
 - [ ] **4.3 Audio Sampler Engine (`src/dsp/sampler.jai`)**
   - [ ] In-memory PCM audio buffer storage.
   - [ ] Linear interpolation resampling for variable-pitch playback.
