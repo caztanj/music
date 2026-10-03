@@ -279,6 +279,55 @@ generate_sample_kit :: (output_directory: string = "samples", sample_rate: int =
     return all_succeeded;
 }
 
+export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE) -> bool {
+    song_specification, parse_success, error_message := parse_song_from_file(song_path, check_samples_on_disk = true);
+    if !parse_success {
+        print("Export error: %\n", error_message);
+
+        return false;
+    }
+
+    sequencer: Sequencer;
+    configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+    sequencer.clock.is_looping = false;
+
+    voice_manager: Voice_Manager;
+    initialize_voice_manager(*voice_manager, sample_rate);
+
+    mixer: Mixer;
+    configure_mixer_from_definition(*mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+    total_frames := calculate_total_clock_samples(*sequencer.clock);
+    if total_frames == 0 {
+        return false;
+    }
+
+    total_samples := cast(s64) total_frames * 2;
+    output_samples := NewArray(total_samples, float);
+    defer free(output_samples.data);
+
+    block_size_in_frames: s64 = 512;
+    rendered_frames: s64 = 0;
+
+    while rendered_frames < cast(s64) total_frames {
+        frames_to_render := cast(s64) total_frames - rendered_frames;
+        if frames_to_render > block_size_in_frames {
+            frames_to_render = block_size_in_frames;
+        }
+
+        slice: [] float;
+        slice.data = output_samples.data + rendered_frames * 2;
+        slice.count = frames_to_render * 2;
+
+        render_sequencer_block(*sequencer, *song_specification, *voice_manager, *mixer, slice, frames_to_render);
+        rendered_frames += frames_to_render;
+    }
+
+    write_success := write_wav_file_32_bit_float(output_wav_path, output_samples, 2, sample_rate);
+
+    return write_success;
+}
+
 Wav_Header :: struct {
     riff_marker: [4] u8;
     total_size: u32;

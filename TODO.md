@@ -10,7 +10,7 @@
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟢 Complete |
 | **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | 🟢 Complete |
-| **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | 🟡 In Progress |
+| **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | 🟢 Complete |
 
 ---
 
@@ -198,7 +198,7 @@
   - [x] `songs/drums.song`: 4-bar drum loop demonstrating step sequencer grids.
   - [x] `songs/synth_lead.song`: Melodic piano-roll notation with synth filter envelope and delay.
   - [x] `songs/full_demo.song`: Multi-instrument track with intro, drop, and complete arrangement.
-- [ ] **9.3 End-to-End Validation**
-  - [ ] Verify offline export generates byte-identical audio outputs given identical inputs.
-  - [ ] Verify real-time playback matches exported WAV file exactly.
-  - [ ] Verify hot reloading of `.song` files provides instant audio update without glitches.
+- [x] **9.3 End-to-End Validation**
+  - [x] Verify offline export generates byte-identical audio outputs given identical inputs.
+  - [x] Verify real-time playback matches exported WAV file exactly.
+  - [x] Verify hot reloading of `.song` files provides instant audio update without glitches.

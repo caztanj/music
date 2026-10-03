@@ -28,6 +28,12 @@ main :: () {
 
         case .EXPORT;
             print("Exporting % to %\n", options.song_path, options.output_path);
+            export_success := export_song_to_wav(options.song_path, options.output_path);
+            if !export_success {
+                print("Export failed!\n");
+                exit(1);
+            }
+            print("Export completed successfully: %\n", options.output_path);
 
         case .TEST_TONE;
             print("Playing 440 Hz test tone for % seconds...\n", options.test_tone_duration);
