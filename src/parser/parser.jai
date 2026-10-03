@@ -416,6 +416,24 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
                 synthesizer_configuration.noise_level = 0.5;
             }
             advance_token(parser);
+        } else if parameter_name == "unison" || parameter_name == "unison_voices" {
+            unison_value, unison_success := parse_number(parser);
+            if !unison_success return false;
+            unison_voice_count := cast(s32) unison_value;
+            if unison_voice_count < 1 {
+                unison_voice_count = 1;
+            } else if unison_voice_count > 8 {
+                unison_voice_count = 8;
+            }
+            synthesizer_configuration.unison_voices = unison_voice_count;
+        } else if parameter_name == "detune" || parameter_name == "unison_detune" {
+            detune_value, detune_success := parse_number(parser);
+            if !detune_success return false;
+            synthesizer_configuration.unison_detune = cast(float) detune_value;
+        } else if parameter_name == "spread" || parameter_name == "unison_spread" {
+            spread_value, spread_success := parse_number(parser);
+            if !spread_success return false;
+            synthesizer_configuration.unison_spread = cast(float) spread_value;
         } else if parameter_name == "gain" || parameter_name == "volume" {
             gain_value, gain_success := parse_number(parser);
             if !gain_success return false;

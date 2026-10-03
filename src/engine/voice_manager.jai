@@ -87,13 +87,13 @@ count_active_voices :: (voice_manager: *Voice_Manager) -> s64 {
 render_voice_sample :: (slot: *Voice_Slot) -> float, float {
     if slot.kind == {
         case .SYNTHESIZER;
-            sample := render_synthesizer_sample(*slot.synthesizer_voice);
+            left_sample, right_sample := render_synthesizer_frame(*slot.synthesizer_voice);
             slot.age_samples += 1;
             if !is_synthesizer_voice_active(*slot.synthesizer_voice) {
                 slot.kind = .INACTIVE;
             }
 
-            return sample, sample;
+            return left_sample, right_sample;
 
         case .SAMPLER;
             left_sample, right_sample := render_sampler_frame(*slot.sampler_voice);

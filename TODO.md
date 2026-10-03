@@ -21,9 +21,9 @@
   - [x] Support secondary oscillator with independent waveform, coarse transpose (semitones), and fine tune (cents).
   - [x] Oscillator mix balance (Osc 1 vs Osc 2).
   - [x] White and Pink noise generator for percussion layering, ambient textures, and sound effects.
-- [ ] **10.2 Stereo Unison & Hyper-Detune**
-  - [ ] Polyphonic voice stacking (2, 4, 8 unison voices per note).
-  - [ ] Configurable stereo spread and detune amount for classic "supersaw" leads and wide reese basses.
+- [x] **10.2 Stereo Unison & Hyper-Detune**
+  - [x] Polyphonic voice stacking (2, 4, 8 unison voices per note).
+  - [x] Configurable stereo spread and detune amount for classic "supersaw" leads and wide reese basses.
 - [ ] **10.3 Dedicated Filter ADSR Envelope**
   - [ ] Independent 4-stage ADSR envelope controlling filter cutoff frequency over time.
   - [ ] Envelope modulation amount (bipolar: -100% to +100%) for classic synth brass, plucks, and squelchy bass.

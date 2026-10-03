@@ -218,6 +218,9 @@ Synthesizer_Configuration :: struct {
     oscillator_mix: float = 0.5;
     noise_level: float = 0.0;
     noise_type: Waveform_Type = .WHITE_NOISE;
+    unison_voices: s32 = 1;
+    unison_detune: float = 15.0;
+    unison_spread: float = 1.0;
     filter: Filter_Configuration;
     envelope: Envelope_Configuration;
     gain: float = 1.0;

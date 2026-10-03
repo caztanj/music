@@ -10,6 +10,16 @@ initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synth
     voice.pink_noise_state_2 = 0.0;
     voice.filter_state_1 = 0.0;
     voice.filter_state_2 = 0.0;
+    voice.filter_right_state_1 = 0.0;
+    voice.filter_right_state_2 = 0.0;
+
+    unison_index := 0;
+    while unison_index < MAXIMUM_UNISON_VOICES {
+        voice.unison_phases[unison_index] = 0.0;
+        voice.unison_oscillator_2_phases[unison_index] = 0.0;
+        unison_index += 1;
+    }
+
     configure_envelope(*voice.amplitude_envelope, configuration.envelope, sample_rate);
 }
 
@@ -19,6 +29,19 @@ trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32
     voice.velocity = velocity;
     voice.is_active = true;
     voice.noise_seed ^= cast(u32) (midi_note_number * 104729 + 19);
+
+    golden_ratio_fraction := 0.618033988749895;
+    unison_index := 0;
+    while unison_index < MAXIMUM_UNISON_VOICES {
+        initial_phase := cast(float64) unison_index * golden_ratio_fraction;
+        voice.unison_phases[unison_index] = initial_phase - cast(float64) cast(s64) initial_phase;
+        initial_phase_2 := cast(float64) (unison_index + 3) * golden_ratio_fraction;
+        voice.unison_oscillator_2_phases[unison_index] = initial_phase_2 - cast(float64) cast(s64) initial_phase_2;
+        unison_index += 1;
+    }
+
+    voice.oscillator_phase = voice.unison_phases[0];
+    voice.oscillator_2_phase = voice.unison_oscillator_2_phases[0];
 
     trigger_attack(*voice.amplitude_envelope);
 }
@@ -36,6 +59,16 @@ reset_synthesizer_voice :: (voice: *Synthesizer_Voice) {
     voice.pink_noise_state_2 = 0.0;
     voice.filter_state_1 = 0.0;
     voice.filter_state_2 = 0.0;
+    voice.filter_right_state_1 = 0.0;
+    voice.filter_right_state_2 = 0.0;
+
+    unison_index := 0;
+    while unison_index < MAXIMUM_UNISON_VOICES {
+        voice.unison_phases[unison_index] = 0.0;
+        voice.unison_oscillator_2_phases[unison_index] = 0.0;
+        unison_index += 1;
+    }
+
     reset_envelope(*voice.amplitude_envelope);
 }
 
@@ -77,58 +110,113 @@ generate_pink_noise_sample :: (noise_seed: *u32, state_0: *float, state_1: *floa
     return pink_sample;
 }
 
-render_synthesizer_sample :: (voice: *Synthesizer_Voice) -> float {
+render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
     if !voice.is_active {
-        return 0.0;
+        return 0.0, 0.0;
     }
 
     envelope_level := process_envelope_sample(*voice.amplitude_envelope);
     if !is_envelope_active(*voice.amplitude_envelope) {
         voice.is_active = false;
 
-        return 0.0;
+        return 0.0, 0.0;
     }
 
-    phase_increment := cast(float64) voice.frequency_hertz / cast(float64) voice.sample_rate;
-    oscillator_sample := generate_oscillator_sample(
-        voice.configuration.waveform,
-        voice.oscillator_phase,
-        phase_increment,
-        *voice.noise_seed,
-        *voice.pink_noise_state_0,
-        *voice.pink_noise_state_1,
-        *voice.pink_noise_state_2
-    );
-
-    voice.oscillator_phase += phase_increment;
-    if voice.oscillator_phase >= 1.0 {
-        voice.oscillator_phase -= 1.0;
+    unison_voice_count := voice.configuration.unison_voices;
+    if unison_voice_count < 1 {
+        unison_voice_count = 1;
+    } else if unison_voice_count > MAXIMUM_UNISON_VOICES {
+        unison_voice_count = MAXIMUM_UNISON_VOICES;
     }
 
-    if voice.configuration.oscillator_2_enabled {
-        frequency_2 := calculate_detuned_frequency(
-            voice.frequency_hertz,
-            voice.configuration.oscillator_2_semitones,
-            voice.configuration.oscillator_2_cents
-        );
-        phase_increment_2 := cast(float64) frequency_2 / cast(float64) voice.sample_rate;
-        oscillator_2_sample := generate_oscillator_sample(
-            voice.configuration.oscillator_2_waveform,
-            voice.oscillator_2_phase,
-            phase_increment_2,
+    effective_detune_cents := voice.configuration.unison_detune;
+    if effective_detune_cents > 0.0 && effective_detune_cents <= 1.0 {
+        effective_detune_cents *= 50.0;
+    }
+
+    left_accumulator := 0.0;
+    right_accumulator := 0.0;
+
+    unison_index := 0;
+    while unison_index < unison_voice_count {
+        cents_offset := 0.0;
+        pan_factor := 0.0;
+
+        if unison_voice_count > 1 {
+            normalized_spread := -1.0 + 2.0 * (cast(float) unison_index) / cast(float) (unison_voice_count - 1);
+            cents_offset = normalized_spread * effective_detune_cents;
+            pan_factor = normalized_spread * voice.configuration.unison_spread;
+        }
+
+        voice_frequency := calculate_detuned_frequency(voice.frequency_hertz, 0, cents_offset);
+        phase_increment := cast(float64) voice_frequency / cast(float64) voice.sample_rate;
+        current_phase := voice.unison_phases[unison_index];
+
+        oscillator_sample := generate_oscillator_sample(
+            voice.configuration.waveform,
+            current_phase,
+            phase_increment,
             *voice.noise_seed,
             *voice.pink_noise_state_0,
             *voice.pink_noise_state_1,
             *voice.pink_noise_state_2
         );
 
-        voice.oscillator_2_phase += phase_increment_2;
-        if voice.oscillator_2_phase >= 1.0 {
-            voice.oscillator_2_phase -= 1.0;
+        current_phase += phase_increment;
+        if current_phase >= 1.0 {
+            current_phase -= 1.0;
+        }
+        voice.unison_phases[unison_index] = current_phase;
+
+        if voice.configuration.oscillator_2_enabled {
+            frequency_2 := calculate_detuned_frequency(
+                voice_frequency,
+                voice.configuration.oscillator_2_semitones,
+                voice.configuration.oscillator_2_cents
+            );
+            phase_increment_2 := cast(float64) frequency_2 / cast(float64) voice.sample_rate;
+            current_phase_2 := voice.unison_oscillator_2_phases[unison_index];
+
+            oscillator_2_sample := generate_oscillator_sample(
+                voice.configuration.oscillator_2_waveform,
+                current_phase_2,
+                phase_increment_2,
+                *voice.noise_seed,
+                *voice.pink_noise_state_0,
+                *voice.pink_noise_state_1,
+                *voice.pink_noise_state_2
+            );
+
+            current_phase_2 += phase_increment_2;
+            if current_phase_2 >= 1.0 {
+                current_phase_2 -= 1.0;
+            }
+            voice.unison_oscillator_2_phases[unison_index] = current_phase_2;
+
+            oscillator_sample = (1.0 - voice.configuration.oscillator_mix) * oscillator_sample + voice.configuration.oscillator_mix * oscillator_2_sample;
         }
 
-        oscillator_sample = (1.0 - voice.configuration.oscillator_mix) * oscillator_sample + voice.configuration.oscillator_mix * oscillator_2_sample;
+        if pan_factor < -1.0 {
+            pan_factor = -1.0;
+        } else if pan_factor > 1.0 {
+            pan_factor = 1.0;
+        }
+
+        pan_left_gain := ifx pan_factor <= 0.0 then 1.0 else (1.0 - pan_factor);
+        pan_right_gain := ifx pan_factor >= 0.0 then 1.0 else (1.0 + pan_factor);
+
+        left_accumulator += oscillator_sample * pan_left_gain;
+        right_accumulator += oscillator_sample * pan_right_gain;
+
+        unison_index += 1;
     }
+
+    voice.oscillator_phase = voice.unison_phases[0];
+    voice.oscillator_2_phase = voice.unison_oscillator_2_phases[0];
+
+    unison_normalization := ifx unison_voice_count > 1 then (1.0 / sqrt(cast(float) unison_voice_count)) else 1.0;
+    left_oscillator := left_accumulator * unison_normalization;
+    right_oscillator := right_accumulator * unison_normalization;
 
     if voice.configuration.noise_level > 0.0 {
         noise_sample := generate_oscillator_sample(
@@ -140,24 +228,49 @@ render_synthesizer_sample :: (voice: *Synthesizer_Voice) -> float {
             *voice.pink_noise_state_1,
             *voice.pink_noise_state_2
         );
-        oscillator_sample += noise_sample * voice.configuration.noise_level;
+        noise_contribution := noise_sample * voice.configuration.noise_level;
+        left_oscillator += noise_contribution;
+        right_oscillator += noise_contribution;
     }
 
-    filtered_sample := oscillator_sample;
+    left_filtered := left_oscillator;
+    right_filtered := right_oscillator;
+
     if voice.configuration.filter.type != .NONE {
-        coefficients := calculate_biquad_coefficients(voice.configuration.filter.type, voice.configuration.filter.cutoff_frequency_hertz, voice.configuration.filter.resonance, voice.sample_rate);
-        filtered_sample = process_biquad_filter(coefficients, oscillator_sample, *voice.filter_state_1, *voice.filter_state_2);
+        coefficients := calculate_biquad_coefficients(
+            voice.configuration.filter.type,
+            voice.configuration.filter.cutoff_frequency_hertz,
+            voice.configuration.filter.resonance,
+            voice.sample_rate
+        );
+        left_filtered = process_biquad_filter(coefficients, left_oscillator, *voice.filter_state_1, *voice.filter_state_2);
+        right_filtered = process_biquad_filter(coefficients, right_oscillator, *voice.filter_right_state_1, *voice.filter_right_state_2);
     }
 
-    output_sample := filtered_sample * envelope_level * voice.velocity * voice.configuration.gain;
+    gain_scaling := envelope_level * voice.velocity * voice.configuration.gain;
+    left_output := left_filtered * gain_scaling;
+    right_output := right_filtered * gain_scaling;
 
-    if output_sample > 1.0 {
-        output_sample = 1.0;
-    } else if output_sample < -1.0 {
-        output_sample = -1.0;
+    if left_output > 1.0 {
+        left_output = 1.0;
+    } else if left_output < -1.0 {
+        left_output = -1.0;
     }
 
-    return output_sample;
+    if right_output > 1.0 {
+        right_output = 1.0;
+    } else if right_output < -1.0 {
+        right_output = -1.0;
+    }
+
+    return left_output, right_output;
+}
+
+render_synthesizer_sample :: (voice: *Synthesizer_Voice) -> float {
+    left_sample, right_sample := render_synthesizer_frame(voice);
+    mono_sample := (left_sample + right_sample) * 0.5;
+
+    return mono_sample;
 }
 
 render_synthesizer_block :: (voice: *Synthesizer_Voice, output_buffer: [] float) {
@@ -315,6 +428,8 @@ process_biquad_filter :: (coefficients: Biquad_Coefficients, input_sample: float
     return output_sample;
 }
 
+MAXIMUM_UNISON_VOICES :: 8;
+
 Biquad_Coefficients :: struct {
     b0: float = 1.0;
     b1: float = 0.0;
@@ -327,12 +442,16 @@ Synthesizer_Voice :: struct {
     configuration: Synthesizer_Configuration;
     oscillator_phase: float64 = 0.0;
     oscillator_2_phase: float64 = 0.0;
+    unison_phases: [MAXIMUM_UNISON_VOICES] float64;
+    unison_oscillator_2_phases: [MAXIMUM_UNISON_VOICES] float64;
     frequency_hertz: float = 440.0;
     midi_note_number: s32 = 60;
     velocity: float = 1.0;
     amplitude_envelope: Envelope_Generator;
     filter_state_1: float = 0.0;
     filter_state_2: float = 0.0;
+    filter_right_state_1: float = 0.0;
+    filter_right_state_2: float = 0.0;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
     is_active: bool = false;
     noise_seed: u32 = 1234567;

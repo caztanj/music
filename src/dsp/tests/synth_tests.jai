@@ -235,4 +235,91 @@ synth_tests :: () {
         expect_equals(instrument.synthesizer.noise_type, Waveform_Type.PINK_NOISE);
         expect_near(instrument.synthesizer.noise_level, 0.2, 0.001);
     });
+
+    test("stereo_unison_renders_multiple_voices_with_stereo_spread", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.unison_voices = 4;
+        configuration.unison_detune = 20.0;
+        configuration.unison_spread = 1.0;
+        configuration.envelope.attack_milliseconds = 2.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.envelope.release_milliseconds = 50.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        channel_difference_accumulated: float = 0.0;
+        left_energy_accumulated: float = 0.0;
+        right_energy_accumulated: float = 0.0;
+        has_glitch := false;
+
+        while sample_index < 1000 {
+            left_sample, right_sample := render_synthesizer_frame(*voice);
+            is_nan_left, is_inf_left := is_nan_is_inf(left_sample);
+            is_nan_right, is_inf_right := is_nan_is_inf(right_sample);
+            if is_nan_left || is_inf_left || is_nan_right || is_inf_right {
+                has_glitch = true;
+            }
+
+            channel_difference_accumulated += abs(left_sample - right_sample);
+            left_energy_accumulated += left_sample * left_sample;
+            right_energy_accumulated += right_sample * right_sample;
+
+            sample_index += 1;
+        }
+
+        expect_true(!has_glitch);
+        expect_true(left_energy_accumulated > 1.0);
+        expect_true(right_energy_accumulated > 1.0);
+        expect_true(channel_difference_accumulated > 5.0);
+    });
+
+    test("stereo_unison_mono_spread_produces_identical_channels", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.unison_voices = 4;
+        configuration.unison_detune = 20.0;
+        configuration.unison_spread = 0.0;
+        configuration.envelope.attack_milliseconds = 2.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.envelope.release_milliseconds = 50.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+        trigger_synthesizer_note_on(*voice, 60, 1.0);
+
+        sample_index := 0;
+        maximum_difference: float = 0.0;
+
+        while sample_index < 500 {
+            left_sample, right_sample := render_synthesizer_frame(*voice);
+            difference := abs(left_sample - right_sample);
+            if difference > maximum_difference {
+                maximum_difference = difference;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_near(maximum_difference, 0.0, 0.0001);
+    });
+
+    test("synthesizer_parser_unison_arguments", () {
+        song_text := "[project]\nname = \"Unison Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nsupersaw = synth(wave=\"saw\", unison=7, detune=25.0, spread=0.85)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nsupersaw -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        instrument, instrument_found := find_instrument(*specification, "supersaw");
+        expect_true(instrument_found);
+        expect_equals(instrument.synthesizer.waveform, Waveform_Type.SAWTOOTH);
+        expect_equals(instrument.synthesizer.unison_voices, 7);
+        expect_near(instrument.synthesizer.unison_detune, 25.0, 0.001);
+        expect_near(instrument.synthesizer.unison_spread, 0.85, 0.001);
+    });
 }
