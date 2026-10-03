@@ -86,4 +86,33 @@ wav_export_tests :: () {
 
         file_delete(test_file_path);
     });
+
+    test("generate_sample_kit_creates_clean_audio_files", () {
+        generate_success := generate_sample_kit("samples", 44100);
+        expect_true(generate_success);
+
+        kick_buffer, kick_success := load_wav_file("samples/kick.wav");
+        expect_true(kick_success);
+        expect_true(kick_buffer.frame_count > 0);
+        expect_equals(kick_buffer.channel_count, 2);
+        expect_equals(kick_buffer.sample_rate, 44100);
+
+        snare_buffer, snare_success := load_wav_file("samples/snare.wav");
+        expect_true(snare_success);
+        expect_true(snare_buffer.frame_count > 0);
+        expect_equals(snare_buffer.channel_count, 2);
+        expect_equals(snare_buffer.sample_rate, 44100);
+
+        hihat_buffer, hihat_success := load_wav_file("samples/hihat.wav");
+        expect_true(hihat_success);
+        expect_true(hihat_buffer.frame_count > 0);
+        expect_equals(hihat_buffer.channel_count, 2);
+        expect_equals(hihat_buffer.sample_rate, 44100);
+
+        clap_buffer, clap_success := load_wav_file("samples/clap.wav");
+        expect_true(clap_success);
+        expect_true(clap_buffer.frame_count > 0);
+        expect_equals(clap_buffer.channel_count, 2);
+        expect_equals(clap_buffer.sample_rate, 44100);
+    });
 }

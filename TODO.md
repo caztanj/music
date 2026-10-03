@@ -10,7 +10,7 @@
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟢 Complete |
 | **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | 🟢 Complete |
-| **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | ⚪ Not Started |
+| **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | 🟡 In Progress |
 
 ---
 
@@ -192,8 +192,8 @@
 
 > **Goal**: Provide out-of-the-box playable songs and verify end-to-end functionality.
 
-- [ ] **9.1 Sample Kit (`samples/`)**
-  - [ ] Bundle standard clean 44.1 kHz WAV samples: `kick.wav`, `snare.wav`, `hihat.wav`, `clap.wav`.
+- [x] **9.1 Sample Kit (`samples/`)**
+  - [x] Bundle standard clean 44.1 kHz WAV samples: `kick.wav`, `snare.wav`, `hihat.wav`, `clap.wav`.
 - [ ] **9.2 Demo Song Files (`songs/`)**
   - [ ] `songs/drums.song`: 4-bar drum loop demonstrating step sequencer grids.
   - [ ] `songs/synth_lead.song`: Melodic piano-roll notation with synth filter envelope and delay.
