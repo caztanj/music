@@ -119,16 +119,16 @@
 
 > **Goal**: Route polyphonic voice outputs through dedicated channel strips, apply insert effects, and master the mix.
 
-- [ ] **5.1 Channel Strips (`src/engine/mixer.jai`)**
-  - [ ] Pre-allocated array of mixer channels (e.g. 16 tracks + Master bus).
-  - [ ] Per-channel Volume Gain (0.0 till 2.0) and Stereo Pan (-1.0 till +1.0).
-  - [ ] Channel Mute and Solo toggles.
-- [ ] **5.2 Insert Effects (`src/dsp/effects.jai`)**
-  - [ ] Stereo Delay: Tempo-synced (e.g. 1/4 note, 1/8 note) with feedback and dry/wet blend.
-  - [ ] Resonant Filter Insert: 12 dB / octave lowpass/highpass sweepable filter.
-- [ ] **5.3 Master Bus & Safety Limiter**
-  - [ ] Fast lookahead or soft-knee saturation curve on the master bus.
-  - [ ] Hard ceiling at -0.1 dBFS to eliminate digital clipping and protect speakers.
+- [x] **5.1 Channel Strips (`src/engine/mixer.jai`)**
+  - [x] Pre-allocated array of mixer channels (e.g. 16 tracks + Master bus).
+  - [x] Per-channel Volume Gain (0.0 till 2.0) and Stereo Pan (-1.0 till +1.0).
+  - [x] Channel Mute and Solo toggles.
+- [x] **5.2 Insert Effects (`src/dsp/effects.jai`)**
+  - [x] Stereo Delay: Tempo-synced (e.g. 1/4 note, 1/8 note) with feedback and dry/wet blend.
+  - [x] Resonant Filter Insert: 12 dB / octave lowpass/highpass sweepable filter.
+- [x] **5.3 Master Bus & Safety Limiter**
+  - [x] Fast lookahead or soft-knee saturation curve on the master bus.
+  - [x] Hard ceiling at -0.1 dBFS to eliminate digital clipping and protect speakers.
 
 **Acceptance Criteria**: Audio routed across multiple mixer tracks sums cleanly without distortion or clipping.
 
