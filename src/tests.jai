@@ -13,6 +13,7 @@ main :: () {
     mixer_tests();
     sequencer_tests();
     watcher_tests();
+    interactive_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -88,6 +89,8 @@ current_test_failed := false;
 #load "engine/tests/sequencer_tests.jai";
 #load "hot_reload/watcher.jai";
 #load "hot_reload/tests/watcher_tests.jai";
+#load "terminal/interactive.jai";
+#load "terminal/tests/interactive_tests.jai";
 
 #import "Basic";
 #import "Math";

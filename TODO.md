@@ -9,7 +9,7 @@
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | 🟢 Complete |
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟢 Complete |
-| **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | ⚪ Not Started |
+| **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | 🟡 In Progress |
 | **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | ⚪ Not Started |
 
 ---
@@ -174,8 +174,8 @@
 
 > **Goal**: Interactive, readable terminal interface during playback.
 
-- [ ] **8.1 Interactive Controls**
-  - [ ] Keybinding listener:
+- [x] **8.1 Interactive Controls**
+  - [x] Keybinding listener:
     - `Space`: Pause / Play.
     - `R`: Rewind to Bar 1.
     - `M`: Toggle Mixer track view.

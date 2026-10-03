@@ -12,7 +12,10 @@ main :: () {
             print_usage();
 
         case .PLAY;
-            print("Playing %\n", options.song_path);
+            play_success := run_interactive_playback(options.song_path);
+            if !play_success {
+                exit(1);
+            }
 
         case .CHECK;
             print("Checking %\n", options.song_path);
@@ -156,6 +159,7 @@ Command_Line_Options :: struct {
 #load "engine/mixer.jai";
 #load "engine/sequencer.jai";
 #load "hot_reload/watcher.jai";
+#load "terminal/interactive.jai";
 
 #import "Basic";
 #import "Math";
