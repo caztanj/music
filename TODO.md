@@ -5,9 +5,9 @@
 | **Phase 1** | Project Scaffolding | Base layout, compilation setup, CLI skeleton | 🟢 Complete |
 | **Phase 2** | Audio Output & WAV Pipeline | WAV file writer & real-time audio playback | 🟢 Complete |
 | **Phase 3** | Text Specification & Parser | Lexer, AST, parser & diagnostic error messages | 🟢 Complete |
-| **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | ⚪ Not Started |
-
+| **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | 🟢 Complete |
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | ⚪ Not Started |
+
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | ⚪ Not Started |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | ⚪ Not Started |
 | **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | ⚪ Not Started |
@@ -105,10 +105,11 @@
   - [x] Linear interpolation resampling for variable-pitch playback.
   - [x] One-shot trigger mode for drum hits.
 
-- [ ] **4.4 Voice Manager (`src/engine/voice_manager.jai`)**
-  - [ ] Pre-allocated pool of 64–128 concurrent active voices.
-  - [ ] Deterministic voice stealing (steals released voices first, then lowest velocity/gain).
-  - [ ] Zero heap allocations during voice activation or rendering.
+- [x] **4.4 Voice Manager (`src/engine/voice_manager.jai`)**
+  - [x] Pre-allocated pool of 64–128 concurrent active voices.
+  - [x] Deterministic voice stealing (steals released voices first, then lowest velocity/gain).
+  - [x] Zero heap allocations during voice activation or rendering.
+
 
 **Acceptance Criteria**: The voice manager can trigger multiple simultaneous synth notes and drum samples without dropouts or allocations.
 

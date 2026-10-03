@@ -151,6 +151,7 @@ Command_Line_Options :: struct {
 #load "dsp/envelope.jai";
 #load "dsp/synth.jai";
 #load "dsp/sampler.jai";
+#load "engine/voice_manager.jai";
 
 #import "Basic";
 #import "Math";
