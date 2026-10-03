@@ -16,6 +16,12 @@ main :: () {
 
         case .CHECK;
             print("Checking %\n", options.song_path);
+            song_specification, success, error_message := parse_song_from_file(options.song_path, check_samples_on_disk = true);
+            if !success {
+                print("Error: %\n", error_message);
+                exit(1);
+            }
+            print("Song '%': Validation successful!\n", song_specification.project.name);
 
         case .EXPORT;
             print("Exporting % to %\n", options.song_path, options.output_path);
@@ -141,6 +147,7 @@ Command_Line_Options :: struct {
 #load "audio/wasapi.jai";
 #load "parser/lexer.jai";
 #load "parser/song_model.jai";
+#load "parser/parser.jai";
 
 #import "Basic";
 #import "Math";

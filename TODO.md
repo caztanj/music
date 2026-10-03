@@ -4,8 +4,9 @@
 |---|---|---|:---:|
 | **Phase 1** | Project Scaffolding | Base layout, compilation setup, CLI skeleton | 🟢 Complete |
 | **Phase 2** | Audio Output & WAV Pipeline | WAV file writer & real-time audio playback | 🟢 Complete |
-| **Phase 3** | Text Specification & Parser | Lexer, AST, parser & diagnostic error messages | ⚪ Not Started |
+| **Phase 3** | Text Specification & Parser | Lexer, AST, parser & diagnostic error messages | 🟢 Complete |
 | **Phase 4** | DSP & Voice Engine | Sampler (resampling), Synth (oscillators, ADSR, filter) | ⚪ Not Started |
+
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | ⚪ Not Started |
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | ⚪ Not Started |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | ⚪ Not Started |
@@ -74,12 +75,13 @@
   - [x] `Routing_Definition`: Instrument-to-mixer track channel mappings.
   - [x] `Arrangement_Definition`: Timeline clips mapping bar ranges to patterns.
 
-- [ ] **3.3 Parser & Diagnostics (`src/parser/parser.jai`)**
-  - [ ] Section-by-section parser with descriptive errors pointing to line and column.
-  - [ ] Semantic verification:
-    - Check that patterns in `[arrangement]` exist in `[pattern]`.
-    - Check that instruments in `[channel_routing]` exist in `[instruments]`.
-    - Check that sample WAV files exist on disk before completing parse.
+- [x] **3.3 Parser & Diagnostics (`src/parser/parser.jai`)**
+  - [x] Section-by-section parser with descriptive errors pointing to line and column.
+  - [x] Semantic verification:
+    - [x] Check that patterns in `[arrangement]` exist in `[pattern]`.
+    - [x] Check that instruments in `[channel_routing]` exist in `[instruments]`.
+    - [x] Check that sample WAV files exist on disk before completing parse.
+
 
 **Acceptance Criteria**: `music_engine check file.song` reports exact file, line, and column for syntax errors, or returns success on valid files.
 

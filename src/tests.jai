@@ -4,6 +4,7 @@ main :: () {
     audio_backend_tests();
     lexer_tests();
     song_model_tests();
+    parser_tests();
 
     print("% passed, % failed\n", tests_passed, tests_failed);
 
@@ -56,11 +57,14 @@ current_test_failed := false;
 #load "audio/wasapi.jai";
 #load "parser/lexer.jai";
 #load "parser/song_model.jai";
+#load "parser/parser.jai";
 #load "tests/common_tests.jai";
 #load "audio/tests/wav_export_tests.jai";
 #load "audio/tests/audio_backend_tests.jai";
 #load "parser/tests/lexer_tests.jai";
 #load "parser/tests/song_model_tests.jai";
+#load "parser/tests/parser_tests.jai";
+
 
 
 #import "Basic";
