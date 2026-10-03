@@ -57,4 +57,47 @@ interactive_tests :: () {
         apply_playback_command(.QUIT, *player);
         expect_true(player.should_exit);
     });
+
+    test("format_vu_meter_bar", () {
+        bar_empty := format_vu_meter_bar(0.0, 12);
+        defer free(bar_empty);
+        expect_equals(bar_empty, "[------------]");
+
+        bar_half := format_vu_meter_bar(0.5, 12);
+        defer free(bar_half);
+        expect_equals(bar_half, "[######------]");
+
+        bar_full := format_vu_meter_bar(1.0, 12);
+        defer free(bar_full);
+        expect_equals(bar_full, "[############]");
+    });
+
+    test("format_vu_meters_display", () {
+        meters := format_vu_meters_display(0.5, 1.0, 12);
+        defer free(meters);
+        expect_equals(meters, "L: [######------]  R: [############]");
+    });
+
+    test("format_playback_status_line", () {
+        player: Playback_State;
+        initialize_sequencer_clock(*player.sequencer.clock, 44100, 128.0, 16, 4, 4);
+        initialize_voice_manager(*player.voice_manager, 44100);
+
+        samples_per_bar := calculate_samples_per_bar(44100, 128.0, 4);
+        samples_per_beat := calculate_samples_per_beat(44100, 128.0);
+        player.sequencer.clock.current_sample = cast(u64) (samples_per_bar * 3.0 + samples_per_beat * 1.5);
+        player.estimated_cpu_percentage = 1.2;
+        player.is_paused = false;
+
+        status_line := format_playback_status_line(*player);
+        defer free(status_line);
+
+        expect_equals(status_line, "[PLAYING] Bar: 04.2 | BPM: 128 | CPU: 1.2% | Voices: 0/128");
+
+        player.is_paused = true;
+        paused_status_line := format_playback_status_line(*player);
+        defer free(paused_status_line);
+
+        expect_equals(paused_status_line, "[PAUSED]  Bar: 04.2 | BPM: 128 | CPU: 1.2% | Voices: 0/128");
+    });
 }

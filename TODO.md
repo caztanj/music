@@ -9,7 +9,7 @@
 | **Phase 5** | Mixer & Insert Effects | Mixer channels, panning, delay line & master limiter | 🟢 Complete |
 | **Phase 6** | Sequencer & Clock | Integer sample clock, pattern triggers, playlist scheduler | 🟢 Complete |
 | **Phase 7** | Hot Reloading Engine | File watcher & lock-free hot swap of song state | 🟢 Complete |
-| **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | 🟡 In Progress |
+| **Phase 8** | CLI & Terminal UX | Playback controls, ASCII timeline & level meters | 🟢 Complete |
 | **Phase 9** | Demo Songs & Verification | Standard drum samples, demo songs & integration tests | ⚪ Not Started |
 
 ---
@@ -180,9 +180,9 @@
     - `R`: Rewind to Bar 1.
     - `M`: Toggle Mixer track view.
     - `Q` / `Esc`: Clean shutdown.
-- [ ] **8.2 Terminal Display**
-  - [ ] Live status line: `[PLAYING] Bar: 04.2 | BPM: 128 | CPU: 1.2% | Voices: 8/64`.
-  - [ ] Visual ASCII VU meters for Master L/R output levels.
+- [x] **8.2 Terminal Display**
+  - [x] Live status line: `[PLAYING] Bar: 04.2 | BPM: 128 | CPU: 1.2% | Voices: 8/64`.
+  - [x] Visual ASCII VU meters for Master L/R output levels.
 
 **Acceptance Criteria**: The terminal displays real-time playback position and responds to keyboard commands smoothly.
 
