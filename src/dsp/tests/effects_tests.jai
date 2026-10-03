@@ -266,4 +266,124 @@ effects_tests :: () {
         expect_near(mixer.master.equalizer.low_band.gain_decibels, -1.5, 0.001);
         expect_near(mixer.master.equalizer.high_band.gain_decibels, 2.5, 0.001);
     });
+
+    test("chorus_flanger_stereo_decorrelation", () {
+        chorus: Chorus_Flanger;
+        initialize_chorus_flanger(*chorus, 44100);
+        defer deinitialize_chorus_flanger(*chorus);
+
+        configure_chorus_flanger(*chorus, rate_hertz = 1.0, depth_milliseconds = 2.0, center_delay_milliseconds = 7.0, feedback = 0.0, mix = 0.5, stereo_phase_degrees = 90.0);
+
+        sample_index := 0;
+        total_stereo_difference: float = 0.0;
+
+        while sample_index < 2000 {
+            phase := (cast(float64) sample_index * 440.0 * 2.0 * PI) / 44100.0;
+            input_sample := cast(float) sin(phase);
+
+            output_left, output_right := process_chorus_flanger(*chorus, input_sample, input_sample);
+
+            if sample_index >= 500 {
+                difference := abs(output_left - output_right);
+                total_stereo_difference += difference;
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(total_stereo_difference > 10.0);
+    });
+
+    test("chorus_flanger_feedback_resonance", () {
+        flanger: Chorus_Flanger;
+        initialize_chorus_flanger(*flanger, 44100);
+        defer deinitialize_chorus_flanger(*flanger);
+
+        exact_delay_milliseconds := cast(float) (100.0 * 1000.0 / 44100.0);
+        configure_chorus_flanger(*flanger, rate_hertz = 0.01, depth_milliseconds = 0.0, center_delay_milliseconds = exact_delay_milliseconds, feedback = 0.5, mix = 1.0, stereo_phase_degrees = 0.0);
+
+        sample_index := 0;
+        first_echo_peak: float = 0.0;
+        second_echo_peak: float = 0.0;
+        third_echo_peak: float = 0.0;
+
+        while sample_index < 400 {
+            input_sample: float = 0.0;
+            if sample_index == 0 {
+                input_sample = 1.0;
+            }
+
+            output_left, _ := process_chorus_flanger(*flanger, input_sample, input_sample);
+
+            if sample_index >= 98 && sample_index <= 102 {
+                if abs(output_left) > first_echo_peak {
+                    first_echo_peak = abs(output_left);
+                }
+            } else if sample_index >= 198 && sample_index <= 202 {
+                if abs(output_left) > second_echo_peak {
+                    second_echo_peak = abs(output_left);
+                }
+            } else if sample_index >= 298 && sample_index <= 302 {
+                if abs(output_left) > third_echo_peak {
+                    third_echo_peak = abs(output_left);
+                }
+            }
+
+            sample_index += 1;
+        }
+
+        expect_true(first_echo_peak > 0.95);
+        expect_true(second_echo_peak > 0.45);
+        expect_true(third_echo_peak > 0.20);
+    });
+
+    test("chorus_flanger_bypass_and_dry_wet", () {
+        chorus: Chorus_Flanger;
+        initialize_chorus_flanger(*chorus, 44100);
+        defer deinitialize_chorus_flanger(*chorus);
+
+        configure_chorus_flanger(*chorus, rate_hertz = 1.0, depth_milliseconds = 2.0, center_delay_milliseconds = 7.0, feedback = 0.0, mix = 0.0, stereo_phase_degrees = 90.0);
+
+        output_left, output_right := process_chorus_flanger(*chorus, 0.735, 0.412);
+        expect_near(output_left, 0.735, 0.0001);
+        expect_near(output_right, 0.412, 0.0001);
+    });
+
+    test("mixer_parser_chorus_arguments", () {
+        song_text := "[project]\nname = \"Chorus Mixer Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\")\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 0.8, chorus = 0.6, chorus_rate = 1.8, chorus_depth = 3.0, chorus_delay = 8.5, chorus_feedback = 0.25, chorus_phase = 120.0, output = master\nmaster: gain = 1.0, flanger = 0.4, flanger_rate = 0.5, flanger_feedback = 0.7, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        track := *specification.mixer.tracks[0];
+        expect_true(track.chorus_enabled);
+        expect_near(track.chorus_mix, 0.6, 0.001);
+        expect_near(track.chorus_rate_hertz, 1.8, 0.001);
+        expect_near(track.chorus_depth_milliseconds, 3.0, 0.001);
+        expect_near(track.chorus_center_delay_milliseconds, 8.5, 0.001);
+        expect_near(track.chorus_feedback, 0.25, 0.001);
+        expect_near(track.chorus_stereo_phase_degrees, 120.0, 0.001);
+
+        expect_true(specification.mixer.master.chorus_enabled);
+        expect_near(specification.mixer.master.chorus_mix, 0.4, 0.001);
+        expect_near(specification.mixer.master.chorus_rate_hertz, 0.5, 0.001);
+        expect_near(specification.mixer.master.chorus_feedback, 0.7, 0.001);
+
+        mixer: Mixer;
+        configure_mixer_from_definition(*mixer, specification.mixer, 44100, 120.0);
+        defer deinitialize_mixer(*mixer);
+
+        expect_true(mixer.tracks[0].chorus_flanger_enabled);
+        expect_near(mixer.tracks[0].chorus_flanger.mix, 0.6, 0.001);
+        expect_near(mixer.tracks[0].chorus_flanger.rate_hertz, 1.8, 0.001);
+        expect_near(mixer.tracks[0].chorus_flanger.depth_milliseconds, 3.0, 0.001);
+        expect_near(mixer.tracks[0].chorus_flanger.center_delay_milliseconds, 8.5, 0.001);
+        expect_near(mixer.tracks[0].chorus_flanger.feedback, 0.25, 0.001);
+        expect_near(mixer.tracks[0].chorus_flanger.stereo_phase_degrees, 120.0, 0.001);
+
+        expect_true(mixer.master.chorus_flanger_enabled);
+        expect_near(mixer.master.chorus_flanger.mix, 0.4, 0.001);
+        expect_near(mixer.master.chorus_flanger.rate_hertz, 0.5, 0.001);
+        expect_near(mixer.master.chorus_flanger.feedback, 0.7, 0.001);
+    });
 }

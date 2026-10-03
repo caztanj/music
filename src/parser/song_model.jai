@@ -385,6 +385,13 @@ Mixer_Track_Definition :: struct {
     equalizer_mid_quality_factor: float = 1.0;
     equalizer_high_gain_decibels: float = 0.0;
     equalizer_high_frequency_hertz: float = 8000.0;
+    chorus_enabled: bool = false;
+    chorus_rate_hertz: float = 1.0;
+    chorus_depth_milliseconds: float = 2.0;
+    chorus_center_delay_milliseconds: float = 7.0;
+    chorus_feedback: float = 0.0;
+    chorus_mix: float = 0.5;
+    chorus_stereo_phase_degrees: float = 90.0;
     output_target: string = "master";
     location: Source_Location;
 }
@@ -406,6 +413,13 @@ Master_Track_Definition :: struct {
     equalizer_mid_quality_factor: float = 1.0;
     equalizer_high_gain_decibels: float = 0.0;
     equalizer_high_frequency_hertz: float = 8000.0;
+    chorus_enabled: bool = false;
+    chorus_rate_hertz: float = 1.0;
+    chorus_depth_milliseconds: float = 2.0;
+    chorus_center_delay_milliseconds: float = 7.0;
+    chorus_feedback: float = 0.0;
+    chorus_mix: float = 0.5;
+    chorus_stereo_phase_degrees: float = 90.0;
     location: Source_Location;
 }
 

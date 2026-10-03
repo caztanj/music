@@ -856,6 +856,36 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             if !frequency_success return false;
             track.equalizer_high_frequency_hertz = cast(float) frequency_value;
             track.equalizer_enabled = true;
+        } else if parameter_name == "chorus" || parameter_name == "chorus_mix" || parameter_name == "flanger" || parameter_name == "flanger_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            track.chorus_mix = cast(float) mix_value;
+            track.chorus_enabled = true;
+        } else if parameter_name == "chorus_rate" || parameter_name == "chorus_speed" || parameter_name == "flanger_rate" || parameter_name == "flanger_speed" {
+            rate_value, rate_success := parse_number(parser);
+            if !rate_success return false;
+            track.chorus_rate_hertz = cast(float) rate_value;
+            track.chorus_enabled = true;
+        } else if parameter_name == "chorus_depth" || parameter_name == "flanger_depth" {
+            depth_value, depth_success := parse_number(parser);
+            if !depth_success return false;
+            track.chorus_depth_milliseconds = cast(float) depth_value;
+            track.chorus_enabled = true;
+        } else if parameter_name == "chorus_delay" || parameter_name == "chorus_time" || parameter_name == "flanger_delay" || parameter_name == "flanger_time" {
+            delay_value, delay_success := parse_number(parser);
+            if !delay_success return false;
+            track.chorus_center_delay_milliseconds = cast(float) delay_value;
+            track.chorus_enabled = true;
+        } else if parameter_name == "chorus_feedback" || parameter_name == "flanger_feedback" {
+            feedback_value, feedback_success := parse_number(parser);
+            if !feedback_success return false;
+            track.chorus_feedback = cast(float) feedback_value;
+            track.chorus_enabled = true;
+        } else if parameter_name == "chorus_phase" || parameter_name == "chorus_stereo_phase" || parameter_name == "flanger_phase" {
+            phase_value, phase_success := parse_number(parser);
+            if !phase_success return false;
+            track.chorus_stereo_phase_degrees = cast(float) phase_value;
+            track.chorus_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown track parameter '%'", parameter_name));
             return false;
@@ -978,6 +1008,36 @@ parse_master_track_parameters :: (parser: *Parser, master_track: *Master_Track_D
             if !frequency_success return false;
             master_track.equalizer_high_frequency_hertz = cast(float) frequency_value;
             master_track.equalizer_enabled = true;
+        } else if parameter_name == "chorus" || parameter_name == "chorus_mix" || parameter_name == "flanger" || parameter_name == "flanger_mix" {
+            mix_value, mix_success := parse_number(parser);
+            if !mix_success return false;
+            master_track.chorus_mix = cast(float) mix_value;
+            master_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_rate" || parameter_name == "chorus_speed" || parameter_name == "flanger_rate" || parameter_name == "flanger_speed" {
+            rate_value, rate_success := parse_number(parser);
+            if !rate_success return false;
+            master_track.chorus_rate_hertz = cast(float) rate_value;
+            master_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_depth" || parameter_name == "flanger_depth" {
+            depth_value, depth_success := parse_number(parser);
+            if !depth_success return false;
+            master_track.chorus_depth_milliseconds = cast(float) depth_value;
+            master_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_delay" || parameter_name == "chorus_time" || parameter_name == "flanger_delay" || parameter_name == "flanger_time" {
+            delay_value, delay_success := parse_number(parser);
+            if !delay_success return false;
+            master_track.chorus_center_delay_milliseconds = cast(float) delay_value;
+            master_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_feedback" || parameter_name == "flanger_feedback" {
+            feedback_value, feedback_success := parse_number(parser);
+            if !feedback_success return false;
+            master_track.chorus_feedback = cast(float) feedback_value;
+            master_track.chorus_enabled = true;
+        } else if parameter_name == "chorus_phase" || parameter_name == "chorus_stereo_phase" || parameter_name == "flanger_phase" {
+            phase_value, phase_success := parse_number(parser);
+            if !phase_success return false;
+            master_track.chorus_stereo_phase_degrees = cast(float) phase_value;
+            master_track.chorus_enabled = true;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown master parameter '%'", parameter_name));
             return false;

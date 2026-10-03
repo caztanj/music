@@ -608,6 +608,171 @@ process_parametric_equalizer :: (equalizer: *Parametric_Equalizer, input_left: f
     return current_left, current_right;
 }
 
+initialize_chorus_flanger :: (chorus_flanger: *Chorus_Flanger, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
+    chorus_flanger.sample_rate = sample_rate;
+    chorus_flanger.enabled = false;
+    chorus_flanger.write_index = 0;
+    chorus_flanger.phase = 0.0;
+    chorus_flanger.rate_hertz = 1.0;
+    chorus_flanger.depth_milliseconds = 2.0;
+    chorus_flanger.center_delay_milliseconds = 7.0;
+    chorus_flanger.feedback = 0.0;
+    chorus_flanger.mix = 0.5;
+    chorus_flanger.stereo_phase_degrees = 90.0;
+    chorus_flanger.buffer_size = MAXIMUM_CHORUS_DELAY_FRAMES;
+
+    if chorus_flanger.left_delay_buffer.count == 0 {
+        chorus_flanger.left_delay_buffer = NewArray(MAXIMUM_CHORUS_DELAY_FRAMES, float);
+        chorus_flanger.right_delay_buffer = NewArray(MAXIMUM_CHORUS_DELAY_FRAMES, float);
+    }
+
+    reset_chorus_flanger(chorus_flanger);
+}
+
+configure_chorus_flanger :: (
+    chorus_flanger: *Chorus_Flanger,
+    rate_hertz: float = 1.0,
+    depth_milliseconds: float = 2.0,
+    center_delay_milliseconds: float = 7.0,
+    feedback: float = 0.0,
+    mix: float = 0.5,
+    stereo_phase_degrees: float = 90.0
+) {
+    chorus_flanger.rate_hertz = rate_hertz;
+    if chorus_flanger.rate_hertz < 0.01 {
+        chorus_flanger.rate_hertz = 0.01;
+    } else if chorus_flanger.rate_hertz > 20.0 {
+        chorus_flanger.rate_hertz = 20.0;
+    }
+
+    chorus_flanger.depth_milliseconds = depth_milliseconds;
+    if chorus_flanger.depth_milliseconds < 0.0 {
+        chorus_flanger.depth_milliseconds = 0.0;
+    } else if chorus_flanger.depth_milliseconds > 15.0 {
+        chorus_flanger.depth_milliseconds = 15.0;
+    }
+
+    chorus_flanger.center_delay_milliseconds = center_delay_milliseconds;
+    if chorus_flanger.center_delay_milliseconds < 0.5 {
+        chorus_flanger.center_delay_milliseconds = 0.5;
+    } else if chorus_flanger.center_delay_milliseconds > 30.0 {
+        chorus_flanger.center_delay_milliseconds = 30.0;
+    }
+
+    chorus_flanger.feedback = feedback;
+    if chorus_flanger.feedback < -0.95 {
+        chorus_flanger.feedback = -0.95;
+    } else if chorus_flanger.feedback > 0.95 {
+        chorus_flanger.feedback = 0.95;
+    }
+
+    chorus_flanger.mix = mix;
+    if chorus_flanger.mix < 0.0 {
+        chorus_flanger.mix = 0.0;
+    } else if chorus_flanger.mix > 1.0 {
+        chorus_flanger.mix = 1.0;
+    }
+
+    chorus_flanger.stereo_phase_degrees = stereo_phase_degrees;
+    chorus_flanger.enabled = chorus_flanger.mix > 0.0;
+}
+
+reset_chorus_flanger :: (chorus_flanger: *Chorus_Flanger) {
+    chorus_flanger.write_index = 0;
+    chorus_flanger.phase = 0.0;
+
+    frame_index := 0;
+    while frame_index < chorus_flanger.left_delay_buffer.count {
+        chorus_flanger.left_delay_buffer[frame_index] = 0.0;
+        chorus_flanger.right_delay_buffer[frame_index] = 0.0;
+        frame_index += 1;
+    }
+}
+
+deinitialize_chorus_flanger :: (chorus_flanger: *Chorus_Flanger) {
+    if chorus_flanger.left_delay_buffer.data != null {
+        array_free(chorus_flanger.left_delay_buffer);
+        chorus_flanger.left_delay_buffer.data = null;
+        chorus_flanger.left_delay_buffer.count = 0;
+    }
+
+    if chorus_flanger.right_delay_buffer.data != null {
+        array_free(chorus_flanger.right_delay_buffer);
+        chorus_flanger.right_delay_buffer.data = null;
+        chorus_flanger.right_delay_buffer.count = 0;
+    }
+}
+
+process_chorus_flanger :: (chorus_flanger: *Chorus_Flanger, input_left: float, input_right: float) -> float, float {
+    if !chorus_flanger.enabled || chorus_flanger.left_delay_buffer.count == 0 {
+        return input_left, input_right;
+    }
+
+    stereo_phase_offset_radians := cast(float64) (chorus_flanger.stereo_phase_degrees * PI / 180.0);
+
+    left_modulation := sin(chorus_flanger.phase);
+    right_modulation := sin(chorus_flanger.phase + stereo_phase_offset_radians);
+
+    left_delay_milliseconds := chorus_flanger.center_delay_milliseconds + chorus_flanger.depth_milliseconds * cast(float) left_modulation;
+    if left_delay_milliseconds < 0.1 {
+        left_delay_milliseconds = 0.1;
+    }
+
+    right_delay_milliseconds := chorus_flanger.center_delay_milliseconds + chorus_flanger.depth_milliseconds * cast(float) right_modulation;
+    if right_delay_milliseconds < 0.1 {
+        right_delay_milliseconds = 0.1;
+    }
+
+    left_delay_samples := left_delay_milliseconds * 0.001 * cast(float) chorus_flanger.sample_rate;
+    right_delay_samples := right_delay_milliseconds * 0.001 * cast(float) chorus_flanger.sample_rate;
+
+    maximum_allowed_delay_samples := cast(float) (chorus_flanger.buffer_size - 2);
+    if left_delay_samples > maximum_allowed_delay_samples {
+        left_delay_samples = maximum_allowed_delay_samples;
+    }
+    if right_delay_samples > maximum_allowed_delay_samples {
+        right_delay_samples = maximum_allowed_delay_samples;
+    }
+
+    left_read_position := cast(float64) chorus_flanger.write_index - cast(float64) left_delay_samples;
+    while left_read_position < 0.0 {
+        left_read_position += cast(float64) chorus_flanger.buffer_size;
+    }
+
+    left_index_previous := (cast(s64) floor(left_read_position)) % chorus_flanger.buffer_size;
+    left_index_next := (left_index_previous + 1) % chorus_flanger.buffer_size;
+    left_fraction := cast(float) (left_read_position - floor(left_read_position));
+    delayed_left := chorus_flanger.left_delay_buffer[left_index_previous] * (1.0 - left_fraction) + chorus_flanger.left_delay_buffer[left_index_next] * left_fraction;
+
+    right_read_position := cast(float64) chorus_flanger.write_index - cast(float64) right_delay_samples;
+    while right_read_position < 0.0 {
+        right_read_position += cast(float64) chorus_flanger.buffer_size;
+    }
+
+    right_index_previous := (cast(s64) floor(right_read_position)) % chorus_flanger.buffer_size;
+    right_index_next := (right_index_previous + 1) % chorus_flanger.buffer_size;
+    right_fraction := cast(float) (right_read_position - floor(right_read_position));
+    delayed_right := chorus_flanger.right_delay_buffer[right_index_previous] * (1.0 - right_fraction) + chorus_flanger.right_delay_buffer[right_index_next] * right_fraction;
+
+    chorus_flanger.left_delay_buffer[chorus_flanger.write_index] = input_left + delayed_left * chorus_flanger.feedback;
+    chorus_flanger.right_delay_buffer[chorus_flanger.write_index] = input_right + delayed_right * chorus_flanger.feedback;
+
+    chorus_flanger.write_index += 1;
+    if chorus_flanger.write_index >= chorus_flanger.buffer_size {
+        chorus_flanger.write_index = 0;
+    }
+
+    chorus_flanger.phase += 2.0 * PI * cast(float64) chorus_flanger.rate_hertz / cast(float64) chorus_flanger.sample_rate;
+    if chorus_flanger.phase >= 2.0 * PI {
+        chorus_flanger.phase -= 2.0 * PI;
+    }
+
+    output_left := input_left * (1.0 - chorus_flanger.mix) + delayed_left * chorus_flanger.mix;
+    output_right := input_right * (1.0 - chorus_flanger.mix) + delayed_right * chorus_flanger.mix;
+
+    return output_left, output_right;
+}
+
 MAXIMUM_DELAY_FRAMES :: 96000;
 MAXIMUM_PREDELAY_FRAMES :: 24000;
 REVERB_COMB_COUNT :: 8;
@@ -699,3 +864,22 @@ Parametric_Equalizer :: struct {
     high_band: Equalizer_Band;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
 }
+
+MAXIMUM_CHORUS_DELAY_FRAMES :: 8192;
+
+Chorus_Flanger :: struct {
+    enabled: bool = false;
+    left_delay_buffer: [] float;
+    right_delay_buffer: [] float;
+    buffer_size: s64 = MAXIMUM_CHORUS_DELAY_FRAMES;
+    write_index: s64 = 0;
+    phase: float64 = 0.0;
+    rate_hertz: float = 1.0;
+    depth_milliseconds: float = 2.0;
+    center_delay_milliseconds: float = 7.0;
+    feedback: float = 0.0;
+    mix: float = 0.5;
+    stereo_phase_degrees: float = 90.0;
+    sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+}
+
