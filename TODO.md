@@ -62,10 +62,11 @@
 
 > **Goal**: Read `.song` files and transform them into a fully validated in-memory domain model (`SongState`).
 
-- [ ] **3.1 Lexer (`src/parser/lexer.jai`)**
-  - [ ] Implement token scanner with source location tracking (`line`, `col`).
-  - [ ] Support tokens: headers (`[section]`), identifiers, literals (int, float, string), operators (`=`, `:`, `->`, `|`), step symbols (`x`, `.`).
-  - [ ] Support line comments (`#` and `//`).
+- [x] **3.1 Lexer (`src/parser/lexer.jai`)**
+  - [x] Implement token scanner with source location tracking (`line`, `col`).
+  - [x] Support tokens: headers (`[section]`), identifiers, literals (int, float, string), operators (`=`, `:`, `->`, `|`), step symbols (`x`, `.`).
+  - [x] Support line comments (`#` and `//`).
+
 - [ ] **3.2 AST & Domain Model (`src/parser/song_model.jai`)**
   - [ ] `Project_Config`: BPM, time signature, bar count.
   - [ ] `Instrument_Def`: Sampler config (path, gain, root note) or Synth config (waveform, filter, envelope).

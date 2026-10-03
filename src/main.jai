@@ -139,6 +139,7 @@ Command_Line_Options :: struct {
 #load "audio/wav_export.jai";
 #load "audio/audio_backend.jai";
 #load "audio/wasapi.jai";
+#load "parser/lexer.jai";
 
 #import "Basic";
 #import "Math";
