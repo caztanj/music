@@ -66,14 +66,14 @@
   - [x] Implement token scanner with source location tracking (`line`, `col`).
   - [x] Support tokens: headers (`[section]`), identifiers, literals (int, float, string), operators (`=`, `:`, `->`, `|`), step symbols (`x`, `.`).
   - [x] Support line comments (`#` and `//`).
+- [x] **3.2 AST & Domain Model (`src/parser/song_model.jai`)**
+  - [x] `Project_Configuration`: BPM, time signature, bar count.
+  - [x] `Instrument_Definition`: Sampler configuration (path, gain, root note) or Synth configuration (waveform, filter, envelope).
+  - [x] `Pattern_Definition`: Step-sequencer grid tracks or piano-roll note lists.
+  - [x] `Mixer_Definition`: Track strips, volume, pan, delay sends, master limiter configuration.
+  - [x] `Routing_Definition`: Instrument-to-mixer track channel mappings.
+  - [x] `Arrangement_Definition`: Timeline clips mapping bar ranges to patterns.
 
-- [ ] **3.2 AST & Domain Model (`src/parser/song_model.jai`)**
-  - [ ] `Project_Config`: BPM, time signature, bar count.
-  - [ ] `Instrument_Def`: Sampler config (path, gain, root note) or Synth config (waveform, filter, envelope).
-  - [ ] `Pattern_Def`: Step-sequencer grid tracks or piano-roll note lists.
-  - [ ] `Mixer_Def`: Track strips, volume, pan, delay sends, master limiter config.
-  - [ ] `Routing_Def`: Instrument-to-mixer track channel mappings.
-  - [ ] `Arrangement_Def`: Timeline clips mapping bar ranges to patterns.
 - [ ] **3.3 Parser & Diagnostics (`src/parser/parser.jai`)**
   - [ ] Section-by-section parser with descriptive errors pointing to line and column.
   - [ ] Semantic verification:
