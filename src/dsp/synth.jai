@@ -410,8 +410,18 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
                 modulation_amount /= 100.0;
             }
 
+            if voice.configuration.filter.velocity_to_envelope != 0.0 {
+                envelope_velocity_scale := (1.0 - voice.configuration.filter.velocity_to_envelope) + voice.configuration.filter.velocity_to_envelope * voice.velocity;
+                if envelope_velocity_scale < 0.0 envelope_velocity_scale = 0.0;
+                modulation_amount *= envelope_velocity_scale;
+            }
+
             octave_range := 5.0;
             total_cutoff_octaves += filter_envelope_level * modulation_amount * octave_range;
+        }
+
+        if voice.configuration.filter.velocity_to_cutoff != 0.0 {
+            total_cutoff_octaves += voice.configuration.filter.velocity_to_cutoff * (voice.velocity - 1.0);
         }
 
         total_cutoff_octaves += filter_modulation_octaves;
@@ -425,17 +435,30 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
             effective_cutoff = 60.0;
         }
 
+        effective_resonance := voice.configuration.filter.resonance;
+        if voice.configuration.filter.velocity_to_resonance != 0.0 {
+            effective_resonance += voice.configuration.filter.velocity_to_resonance * (voice.velocity - 1.0);
+            if effective_resonance < 0.0 effective_resonance = 0.0;
+            if effective_resonance > 0.98 effective_resonance = 0.98;
+        }
+
         coefficients := calculate_biquad_coefficients(
             voice.configuration.filter.type,
             effective_cutoff,
-            voice.configuration.filter.resonance,
+            effective_resonance,
             voice.sample_rate
         );
         left_filtered = process_biquad_filter(coefficients, left_oscillator, *voice.filter_state_1, *voice.filter_state_2);
         right_filtered = process_biquad_filter(coefficients, right_oscillator, *voice.filter_right_state_1, *voice.filter_right_state_2);
     }
 
-    gain_scaling := envelope_level * voice.velocity * voice.configuration.gain;
+    effective_velocity := voice.velocity;
+    if voice.configuration.velocity_to_gain != 1.0 {
+        effective_velocity = (1.0 - voice.configuration.velocity_to_gain) + voice.configuration.velocity_to_gain * voice.velocity;
+        if effective_velocity < 0.0 effective_velocity = 0.0;
+    }
+
+    gain_scaling := envelope_level * effective_velocity * voice.configuration.gain;
     if volume_modulation != 0.0 {
         volume_factor := 1.0 + volume_modulation;
         if volume_factor < 0.0 {

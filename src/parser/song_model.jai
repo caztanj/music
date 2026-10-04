@@ -414,6 +414,9 @@ Filter_Configuration :: struct {
     cutoff_frequency_hertz: float = 20000.0;
     resonance: float = 0.0;
     envelope_amount: float = 0.0;
+    velocity_to_envelope: float = 0.0;
+    velocity_to_cutoff: float = 0.0;
+    velocity_to_resonance: float = 0.0;
     envelope: Envelope_Configuration;
 }
 
@@ -475,6 +478,7 @@ Synthesizer_Configuration :: struct {
     portamento_tempo_sync_denominator: s32 = 16;
     is_portamento_triplet: bool = false;
     legato: bool = true;
+    velocity_to_gain: float = 1.0;
 }
 
 

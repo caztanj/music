@@ -734,5 +734,118 @@ synth_tests :: () {
         expect_equals(lead.synthesizer.portamento_tempo_sync_denominator, 16);
         expect_true(!lead.synthesizer.legato);
     });
+
+    test("velocity_scales_amplifier_gain_and_dynamic_envelope", () {
+        voice_manager: Voice_Manager;
+        initialize_voice_manager(*voice_manager, 44100);
+
+        configuration_with_velocity_gain: Synthesizer_Configuration;
+        configuration_with_velocity_gain.waveform = .SAWTOOTH;
+        configuration_with_velocity_gain.gain = 1.0;
+        configuration_with_velocity_gain.velocity_to_gain = 1.0;
+        configuration_with_velocity_gain.envelope.attack_milliseconds = 2.0;
+        configuration_with_velocity_gain.envelope.decay_milliseconds = 100.0;
+        configuration_with_velocity_gain.envelope.sustain_level = 1.0;
+
+        full_velocity_slot := trigger_synthesizer_note(*voice_manager, "synth", 1, configuration_with_velocity_gain, 60, 1.0);
+        half_velocity_slot := trigger_synthesizer_note(*voice_manager, "synth", 2, configuration_with_velocity_gain, 60, 0.5);
+
+        sample_counter := 0;
+        full_max_amplitude: float = 0.0;
+        half_max_amplitude: float = 0.0;
+
+        while sample_counter < 300 {
+            full_sample := render_voice_sample(full_velocity_slot);
+            half_sample := render_voice_sample(half_velocity_slot);
+
+            if abs(full_sample) > full_max_amplitude full_max_amplitude = abs(full_sample);
+            if abs(half_sample) > half_max_amplitude half_max_amplitude = abs(half_sample);
+
+            sample_counter += 1;
+        }
+
+        expect_true(full_max_amplitude > 0.8);
+        expect_near(half_max_amplitude, full_max_amplitude * 0.5, 0.05);
+
+        configuration_without_velocity_gain: Synthesizer_Configuration;
+        configuration_without_velocity_gain.waveform = .SAWTOOTH;
+        configuration_without_velocity_gain.gain = 1.0;
+        configuration_without_velocity_gain.velocity_to_gain = 0.0;
+        configuration_without_velocity_gain.envelope.attack_milliseconds = 2.0;
+        configuration_without_velocity_gain.envelope.decay_milliseconds = 100.0;
+        configuration_without_velocity_gain.envelope.sustain_level = 1.0;
+
+        fixed_full_slot := trigger_synthesizer_note(*voice_manager, "synth", 3, configuration_without_velocity_gain, 60, 1.0);
+        fixed_half_slot := trigger_synthesizer_note(*voice_manager, "synth", 4, configuration_without_velocity_gain, 60, 0.3);
+
+        sample_counter = 0;
+        fixed_full_max: float = 0.0;
+        fixed_half_max: float = 0.0;
+
+        while sample_counter < 300 {
+            full_sample := render_voice_sample(fixed_full_slot);
+            half_sample := render_voice_sample(fixed_half_slot);
+
+            if abs(full_sample) > fixed_full_max fixed_full_max = abs(full_sample);
+            if abs(half_sample) > fixed_half_max fixed_half_max = abs(half_sample);
+
+            sample_counter += 1;
+        }
+
+        expect_near(fixed_full_max, fixed_half_max, 0.02);
+    });
+
+    test("velocity_modulates_filter_envelope_and_cutoff", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.filter.type = .LOWPASS;
+        configuration.filter.cutoff_frequency_hertz = 500.0;
+        configuration.filter.envelope_amount = 0.8;
+        configuration.filter.velocity_to_envelope = 1.0;
+        configuration.filter.velocity_to_cutoff = 1.5;
+        configuration.filter.resonance = 0.2;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 50.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.filter.envelope.attack_milliseconds = 1.0;
+        configuration.filter.envelope.decay_milliseconds = 50.0;
+        configuration.filter.envelope.sustain_level = 0.8;
+
+        voice_manager: Voice_Manager;
+        initialize_voice_manager(*voice_manager, 44100);
+
+        accent_voice_slot := trigger_synthesizer_note(*voice_manager, "synth", 1, configuration, 60, ACCENT_NOTE_VELOCITY);
+        ghost_voice_slot := trigger_synthesizer_note(*voice_manager, "synth", 2, configuration, 60, GHOST_NOTE_VELOCITY);
+
+        sample_index := 0;
+        accent_energy: float = 0.0;
+        ghost_energy: float = 0.0;
+
+        while sample_index < 400 {
+            accent_sample := render_voice_sample(accent_voice_slot);
+            ghost_sample := render_voice_sample(ghost_voice_slot);
+
+            accent_energy += accent_sample * accent_sample;
+            ghost_energy += ghost_sample * ghost_sample;
+
+            sample_index += 1;
+        }
+
+        expect_true(accent_energy > ghost_energy * 2.0);
+    });
+
+    test("synthesizer_parser_velocity_mapping_arguments", () {
+        song_text := "[project]\nname = \"Velocity Mapping Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nlead = synth(wave=\"saw\", filter=\"lowpass\", cutoff=600, vel_to_filter=80%, vel_to_cutoff=1.5, vel_to_res=0.4, vel_to_gain=0.75)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        lead, lead_found := find_instrument(*specification, "lead");
+        expect_true(lead_found);
+        expect_near(lead.synthesizer.filter.velocity_to_envelope, 0.80, 0.001);
+        expect_near(lead.synthesizer.filter.velocity_to_cutoff, 1.5, 0.001);
+        expect_near(lead.synthesizer.filter.velocity_to_resonance, 0.40, 0.001);
+        expect_near(lead.synthesizer.velocity_to_gain, 0.75, 0.001);
+    });
 }
 

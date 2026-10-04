@@ -92,9 +92,9 @@
 - [x] **13.3 Triplets & Micro-timing Subdivisions**
   - [x] Support for 8th, 16th, and 32nd note triplets in step grids and piano rolls (e.g. `t1`, `t2`, `t3`).
   - [x] Micro-step tick offsets for humanized timing and strumming emulation.
-- [ ] **13.4 Velocity Mapping & Dynamics**
-  - [ ] Note velocity dynamically scaling synth filter envelope depth, resonance, and amplifier gain.
-  - [ ] Ghost notes and accent markers in pattern definitions.
+- [x] **13.4 Velocity Mapping & Dynamics**
+  - [x] Note velocity dynamically scaling synth filter envelope depth, resonance, and amplifier gain.
+  - [x] Ghost notes and accent markers in pattern definitions.
 
 **Acceptance Criteria**: Drum loops swing naturally with classic MPC-style shuffle, and synth bass lines glide fluidly between notes.
 

@@ -340,5 +340,83 @@ END;
         expect_equals(strum_pattern.piano_roll_notes[3].tick_offset, 16);
         expect_equals(strum_pattern.piano_roll_notes[3].length_ticks, 16);
     });
+
+    test("pattern ghost and accent note dynamics parsing", () {
+        song_text := #string END
+[project]
+name = "Dynamics Test"
+bpm = 120
+time_signature = 4/4
+bars = 1
+
+[instruments]
+kick = synth(wave="sine")
+snare = synth(wave="triangle")
+hat = synth(wave="square")
+lead = synth(wave="saw")
+
+[pattern drum_dynamics]
+snare | . . g . ^ . ! . |
+hat   | [x g ^ x] . ghost . |
+kick  | a . accent . x . . . |
+
+[pattern melody_dynamics]
+^C4 step=0 len=2
+!E4 step=2 len=2
+G4  step=4 len=2 ghost
+B4  step=6 len=2 accent
+D5  step=8 len=2 vel=ghost
+F5  step=10 len=2 vel=accent
+A5  step=12 len=2 vel=75%
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+snare -> track 1
+hat -> track 1
+lead -> track 1
+
+[arrangement]
+bar 1: drum_dynamics
+bar 1: melody_dynamics
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "dynamics.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        drum_pattern, drum_pattern_found := find_pattern(*song_specification, "drum_dynamics");
+        expect_true(drum_pattern_found);
+
+        snare_track := *drum_pattern.step_tracks[0];
+        expect_near(snare_track.velocities[2], GHOST_NOTE_VELOCITY, 0.001);
+        expect_near(snare_track.velocities[4], ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(snare_track.velocities[6], ACCENT_NOTE_VELOCITY, 0.001);
+
+        hat_track := *drum_pattern.step_tracks[1];
+        expect_equals(hat_track.step_events[0].velocity, 1.0);
+        expect_near(hat_track.step_events[1].velocity, GHOST_NOTE_VELOCITY, 0.001);
+        expect_near(hat_track.step_events[2].velocity, ACCENT_NOTE_VELOCITY, 0.001);
+        expect_equals(hat_track.step_events[3].velocity, 1.0);
+        expect_near(hat_track.velocities[2], GHOST_NOTE_VELOCITY, 0.001);
+
+        kick_track := *drum_pattern.step_tracks[2];
+        expect_near(kick_track.velocities[0], ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(kick_track.velocities[2], ACCENT_NOTE_VELOCITY, 0.001);
+
+        melody_pattern, melody_pattern_found := find_pattern(*song_specification, "melody_dynamics");
+        expect_true(melody_pattern_found);
+        expect_equals(melody_pattern.piano_roll_notes.count, 7);
+
+        expect_near(melody_pattern.piano_roll_notes[0].velocity, ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[1].velocity, ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[2].velocity, GHOST_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[3].velocity, ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[4].velocity, GHOST_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[5].velocity, ACCENT_NOTE_VELOCITY, 0.001);
+        expect_near(melody_pattern.piano_roll_notes[6].velocity, 0.75, 0.001);
+    });
 }
 

@@ -726,6 +726,41 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
                 set_error(parser, token.location, sprint("Expected 'on' or 'off' for legato, got '%'", text_value));
                 return false;
             }
+        } else if parameter_name == "velocity_to_filter" || parameter_name == "vel_to_filter" || parameter_name == "filter_velocity" || parameter_name == "filter_vel" || parameter_name == "velocity_to_envelope" || parameter_name == "vel_to_env" || parameter_name == "env_velocity" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+            filter_vel := cast(float) number_value;
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+                filter_vel /= 100.0;
+            } else if filter_vel > 1.0 {
+                filter_vel /= 100.0;
+            }
+            synthesizer_configuration.filter.velocity_to_envelope = filter_vel;
+        } else if parameter_name == "velocity_to_cutoff" || parameter_name == "vel_to_cutoff" || parameter_name == "cutoff_velocity" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+            synthesizer_configuration.filter.velocity_to_cutoff = cast(float) number_value;
+        } else if parameter_name == "velocity_to_resonance" || parameter_name == "vel_to_res" || parameter_name == "resonance_velocity" || parameter_name == "res_velocity" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+            res_vel := cast(float) number_value;
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+                res_vel /= 100.0;
+            } else if res_vel > 1.0 {
+                res_vel /= 100.0;
+            }
+            synthesizer_configuration.filter.velocity_to_resonance = res_vel;
+        } else if parameter_name == "velocity_to_gain" || parameter_name == "vel_to_gain" || parameter_name == "amp_velocity" || parameter_name == "amp_vel" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+            amp_vel := cast(float) number_value;
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+                amp_vel /= 100.0;
+            }
+            synthesizer_configuration.velocity_to_gain = amp_vel;
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown synthesizer parameter '%'", parameter_name));
             return false;
@@ -752,12 +787,23 @@ parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Sourc
             break;
         }
 
+        if token.type == .CARET || token.type == .EXCLAMATION {
+            success := parse_piano_roll_row(parser, *pattern);
+            if !success return false;
+            continue;
+        }
+
         if token.type != .IDENTIFIER {
             set_error(parser, token.location, sprint("Expected note name or instrument in pattern, got '%'", token.text));
             return false;
         }
 
         next_token_peek := peek_token(parser, 1);
+        if (token.text == "accent" || token.text == "ghost") && next_token_peek.type == .IDENTIFIER && note_to_midi(next_token_peek.text) >= 0 {
+            success := parse_piano_roll_row(parser, *pattern);
+            if !success return false;
+            continue;
+        }
         if (token.text == "swing" || token.text == "shuffle") && next_token_peek.type == .EQUALS {
             advance_token(parser);
             advance_token(parser);
@@ -874,8 +920,11 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
             return false;
         }
 
-        if step_token.type == .STEP_HIT {
+        if step_token.type == .STEP_HIT || step_token.type == .CARET || step_token.type == .EXCLAMATION {
             velocity_value: float = 1.0;
+            if step_token.type == .CARET || step_token.type == .EXCLAMATION {
+                velocity_value = ACCENT_NOTE_VELOCITY;
+            }
             advance_token(parser);
             if current_token(parser).type == .COLON {
                 advance_token(parser);
@@ -936,9 +985,12 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
 
             while !parser.has_error && current_token(parser).type != .CLOSE_BRACKET && current_token(parser).type != .END_OF_FILE && current_token(parser).type != .NEWLINE {
                 item_token := current_token(parser);
-                if item_token.type == .STEP_HIT {
+                if item_token.type == .STEP_HIT || item_token.type == .CARET || item_token.type == .EXCLAMATION {
                     advance_token(parser);
                     item_velocity: float = 1.0;
+                    if item_token.type == .CARET || item_token.type == .EXCLAMATION {
+                        item_velocity = ACCENT_NOTE_VELOCITY;
+                    }
                     if current_token(parser).type == .COLON {
                         advance_token(parser);
                         num, num_ok := parse_number(parser);
@@ -954,8 +1006,14 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
                     if item_velocity > 1.0 item_velocity = 1.0;
                     array_add(*sub_items, Sub_Step_Item.{is_hit = true, velocity = item_velocity});
                 } else if item_token.type == .IDENTIFIER {
+                    item_name := item_token.text;
                     advance_token(parser);
                     item_velocity: float = 1.0;
+                    if item_name == "g" || item_name == "G" || item_name == "ghost" {
+                        item_velocity = GHOST_NOTE_VELOCITY;
+                    } else if item_name == "a" || item_name == "A" || item_name == "accent" {
+                        item_velocity = ACCENT_NOTE_VELOCITY;
+                    }
                     if current_token(parser).type == .COLON {
                         advance_token(parser);
                         num, num_ok := parse_number(parser);
@@ -974,17 +1032,21 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
             if sub_items.count > 0 {
                 ticks_per_sub := TICKS_PER_STEP / sub_items.count;
                 has_any_hit := false;
+                max_sub_velocity: float = 0.0;
                 item_index := 0;
                 while item_index < sub_items.count {
                     if sub_items[item_index].is_hit {
                         has_any_hit = true;
+                        if sub_items[item_index].velocity > max_sub_velocity {
+                            max_sub_velocity = sub_items[item_index].velocity;
+                        }
                         tick_offset := item_index * ticks_per_sub;
                         array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = tick_offset, velocity = sub_items[item_index].velocity});
                     }
                     item_index += 1;
                 }
                 array_add(*track.steps, has_any_hit);
-                array_add(*track.velocities, ifx has_any_hit then 1.0 else 0.0);
+                array_add(*track.velocities, max_sub_velocity);
             } else {
                 array_add(*track.steps, false);
                 array_add(*track.velocities, 0.0);
@@ -992,7 +1054,20 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
             current_step += 1;
         } else if step_token.type == .IDENTIFIER {
             name := step_token.text;
-            if name == "t1" || name == "t2" || name == "t3" || name == "t" || name == "T1" || name == "T2" || name == "T3" || name == "T" {
+            if name == "g" || name == "G" || name == "ghost" || name == "a" || name == "A" || name == "accent" {
+                velocity_value: float = ifx (name == "g" || name == "G" || name == "ghost") then GHOST_NOTE_VELOCITY else ACCENT_NOTE_VELOCITY;
+                advance_token(parser);
+                if current_token(parser).type == .COLON {
+                    advance_token(parser);
+                    number_value, number_success := parse_number(parser);
+                    if !number_success return false;
+                    velocity_value = ifx number_value > 1.0 then cast(float) (number_value / 10.0) else cast(float) number_value;
+                }
+                array_add(*track.steps, true);
+                array_add(*track.velocities, velocity_value);
+                array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = 0, velocity = velocity_value});
+                current_step += 1;
+            } else if name == "t1" || name == "t2" || name == "t3" || name == "t" || name == "T1" || name == "T2" || name == "T3" || name == "T" {
                 velocity_value: float = 1.0;
                 advance_token(parser);
                 if current_token(parser).type == .COLON {
@@ -1065,6 +1140,20 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
 }
 
 parse_piano_roll_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool {
+    initial_velocity: float = 1.0;
+
+    first_token := current_token(parser);
+    if first_token.type == .CARET || first_token.type == .EXCLAMATION {
+        initial_velocity = ACCENT_NOTE_VELOCITY;
+        advance_token(parser);
+    } else if first_token.type == .IDENTIFIER && (first_token.text == "accent" || first_token.text == "ghost") {
+        peeked_token := peek_token(parser, 1);
+        if peeked_token.type == .IDENTIFIER && note_to_midi(peeked_token.text) >= 0 {
+            initial_velocity = ifx first_token.text == "accent" then ACCENT_NOTE_VELOCITY else GHOST_NOTE_VELOCITY;
+            advance_token(parser);
+        }
+    }
+
     note_token := current_token(parser);
     note_name := note_token.text;
     advance_token(parser);
@@ -1077,6 +1166,7 @@ parse_piano_roll_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool 
 
     piano_roll_note: Piano_Roll_Note;
     piano_roll_note.midi_note_number = midi_number;
+    piano_roll_note.velocity = initial_velocity;
     piano_roll_note.location = note_token.location;
 
     while !parser.has_error && parser.current_token_index < parser.tokens.count {
@@ -1093,6 +1183,46 @@ parse_piano_roll_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool 
 
         parameter_name := token.text;
         advance_token(parser);
+
+        if parameter_name == "accent" {
+            if current_token(parser).type == .EQUALS {
+                advance_token(parser);
+                val_tok := current_token(parser);
+                if val_tok.type == .IDENTIFIER && (val_tok.text == "true" || val_tok.text == "on" || val_tok.text == "yes") {
+                    piano_roll_note.velocity = ACCENT_NOTE_VELOCITY;
+                    advance_token(parser);
+                } else if val_tok.type == .IDENTIFIER && (val_tok.text == "false" || val_tok.text == "off" || val_tok.text == "no") {
+                    advance_token(parser);
+                } else {
+                    num_val, num_ok := parse_number(parser);
+                    if !num_ok return false;
+                    piano_roll_note.velocity = cast(float) num_val;
+                }
+            } else {
+                piano_roll_note.velocity = ACCENT_NOTE_VELOCITY;
+            }
+            continue;
+        }
+
+        if parameter_name == "ghost" {
+            if current_token(parser).type == .EQUALS {
+                advance_token(parser);
+                val_tok := current_token(parser);
+                if val_tok.type == .IDENTIFIER && (val_tok.text == "true" || val_tok.text == "on" || val_tok.text == "yes") {
+                    piano_roll_note.velocity = GHOST_NOTE_VELOCITY;
+                    advance_token(parser);
+                } else if val_tok.type == .IDENTIFIER && (val_tok.text == "false" || val_tok.text == "off" || val_tok.text == "no") {
+                    advance_token(parser);
+                } else {
+                    num_val, num_ok := parse_number(parser);
+                    if !num_ok return false;
+                    piano_roll_note.velocity = cast(float) num_val;
+                }
+            } else {
+                piano_roll_note.velocity = GHOST_NOTE_VELOCITY;
+            }
+            continue;
+        }
 
         equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after note parameter name");
         if !equals_success return false;
@@ -1259,9 +1389,31 @@ parse_piano_roll_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool 
             if !ticks_success return false;
             piano_roll_note.length_ticks = ticks_token.integer_value;
         } else if parameter_name == "vel" || parameter_name == "velocity" {
-            velocity_value, velocity_success := parse_number(parser);
-            if !velocity_success return false;
-            piano_roll_note.velocity = cast(float) velocity_value;
+            vel_token := current_token(parser);
+            if vel_token.type == .CARET || vel_token.type == .EXCLAMATION {
+                piano_roll_note.velocity = ACCENT_NOTE_VELOCITY;
+                advance_token(parser);
+            } else if vel_token.type == .IDENTIFIER {
+                ident := vel_token.text;
+                if ident == "accent" || ident == "a" || ident == "A" {
+                    piano_roll_note.velocity = ACCENT_NOTE_VELOCITY;
+                    advance_token(parser);
+                } else if ident == "ghost" || ident == "g" || ident == "G" {
+                    piano_roll_note.velocity = GHOST_NOTE_VELOCITY;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, vel_token.location, sprint("Unknown velocity identifier '%'", ident));
+                    return false;
+                }
+            } else {
+                velocity_value, velocity_success := parse_number(parser);
+                if !velocity_success return false;
+                if current_token(parser).type == .PERCENT {
+                    advance_token(parser);
+                    velocity_value /= 100.0;
+                }
+                piano_roll_note.velocity = cast(float) velocity_value;
+            }
         } else {
             set_error(parser, token.location, sprint("Unknown note parameter '%'", parameter_name));
             return false;
