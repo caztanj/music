@@ -639,5 +639,174 @@ sequencer_tests :: () {
             i += 1;
         }
     });
+
+    test("timeline_curve_interpolation_linear_exponential_logarithmic", () {
+        expect_near(evaluate_automation_curve_normalized(.LINEAR, 0.0), 0.0, 0.0001);
+        expect_near(evaluate_automation_curve_normalized(.LINEAR, 0.5), 0.5, 0.0001);
+        expect_near(evaluate_automation_curve_normalized(.LINEAR, 1.0), 1.0, 0.0001);
+
+        exp_mid := evaluate_automation_curve_normalized(.EXPONENTIAL, 0.5);
+        expect_near(evaluate_automation_curve_normalized(.EXPONENTIAL, 0.0), 0.0, 0.0001);
+        expect_near(evaluate_automation_curve_normalized(.EXPONENTIAL, 1.0), 1.0, 0.0001);
+        expect_true(exp_mid > 0.15 && exp_mid < 0.25);
+
+        log_mid := evaluate_automation_curve_normalized(.LOGARITHMIC, 0.5);
+        expect_near(evaluate_automation_curve_normalized(.LOGARITHMIC, 0.0), 0.0, 0.0001);
+        expect_near(evaluate_automation_curve_normalized(.LOGARITHMIC, 1.0), 1.0, 0.0001);
+        expect_true(log_mid > 0.75 && log_mid < 0.85);
+
+        expect_near(exp_mid + log_mid, 1.0, 0.0001);
+    });
+
+    test("filter_cutoff_8_bar_buildup_exponential_sweep_and_drop", () {
+        song_text := #string END
+[project]
+name = "Drop Build-up Test"
+bpm = 120
+bars = 32
+
+[instruments]
+lead = synth(wave="saw")
+
+[pattern main]
+lead | x . . . |
+
+[mixer]
+track 1: gain = 1.0, pan = 0.0
+master: gain = 1.0
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1-32: main
+
+[automation]
+automate track 1.filter_cutoff from 200 to 8000 over bar 9-16 curve=exponential
+END;
+
+        song_specification, parse_success, error_message := parse_song(song_text, "buildup.song", check_samples_on_disk = false);
+        expect_true(parse_success);
+        expect_equals(song_specification.automation.curves.count, 1);
+
+        curve := *song_specification.automation.curves[0];
+        sample_rate: s64 = 44100;
+        samples_per_bar := cast(u64) calculate_samples_per_bar(sample_rate, 120.0, 4);
+
+        before_buildup_sample := 0;
+        before_cutoff := evaluate_automation_curve_at_sample(curve, cast(u64) before_buildup_sample, sample_rate, 120.0, 4);
+        expect_near(before_cutoff, 200.0, 0.001);
+
+        bar_9_sample := (9 - 1) * samples_per_bar;
+        bar_9_cutoff := evaluate_automation_curve_at_sample(curve, bar_9_sample, sample_rate, 120.0, 4);
+        expect_near(bar_9_cutoff, 200.0, 0.001);
+
+        bar_13_sample := (13 - 1) * samples_per_bar;
+        bar_13_cutoff := evaluate_automation_curve_at_sample(curve, bar_13_sample, sample_rate, 120.0, 4);
+        expected_geometric_midpoint := 200.0 * sqrt(40.0);
+        expect_near(bar_13_cutoff, expected_geometric_midpoint, 0.1);
+
+        drop_sample := (17 - 1) * samples_per_bar;
+        drop_cutoff := evaluate_automation_curve_at_sample(curve, drop_sample, sample_rate, 120.0, 4);
+        expect_near(drop_cutoff, 8000.0, 0.001);
+
+        after_drop_sample := (18 - 1) * samples_per_bar;
+        after_drop_cutoff := evaluate_automation_curve_at_sample(curve, after_drop_sample, sample_rate, 120.0, 4);
+        expect_near(after_drop_cutoff, 8000.0, 0.001);
+    });
+
+    test("sample_accurate_block_rendering_automation_updates", () {
+        song_text := #string END
+[project]
+name = "Full Automation Suite"
+bpm = 120
+bars = 20
+
+[instruments]
+synth_lead = synth(wave="saw")
+
+[pattern p1]
+synth_lead | x . . . |
+
+[mixer]
+track 1: gain = 0.0, pan = -1.0, filter = "lowpass", cutoff = 1000, resonance = 0.2
+master: gain = 1.0
+
+[channel_routing]
+synth_lead -> track 1
+
+[arrangement]
+bar 1-20: p1
+
+[automation]
+automate track 1.gain from 0.0 to 1.0 over bar 1-4 curve=linear
+automate track 1.pan from -1.0 to 1.0 over bar 1-4 curve=linear
+automate track 1.filter_cutoff from 200 to 8000 over bar 1-4 curve=exponential
+automate track 1.resonance from 0.2 to 0.8 over bar 1-4 curve=linear
+automate track 1.send 1 from 0.0 to 0.75 over bar 1-4 curve=linear
+automate master.gain from 0.5 to 1.0 over bar 1-4 curve=linear
+automate tempo from 120 to 140 over bar 1-4 curve=linear
+END;
+
+        song_specification, parse_success, error_message := parse_song(song_text, "full_auto.song", check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        sequencer := New(Sequencer);
+        defer free(sequencer);
+        configure_sequencer_from_song(sequencer, *song_specification, sample_rate = 44100);
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+        initialize_mixer(mixer, 44100);
+        configure_mixer_from_definition(mixer, song_specification.mixer, 44100, 120.0);
+
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, 44100);
+
+        output_buffer: [1024] float;
+
+        render_sequencer_block(sequencer, *song_specification, voice_manager, mixer, output_buffer, 512);
+
+        channel, channel_found := find_mixer_channel(mixer, 1);
+        expect_true(channel_found);
+
+        expect_near(channel.gain, 0.0, 0.01);
+        expect_near(channel.pan, -1.0, 0.01);
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, 200.0, 5.0);
+        expect_near(channel.filter_insert.resonance, 0.2, 0.01);
+        expect_near(channel.send_levels[0], 0.0, 0.01);
+        expect_near(mixer.master.gain, 0.5, 0.01);
+        expect_near(sequencer.clock.beats_per_minute, 120.0, 0.1);
+
+        samples_per_bar := cast(u64) calculate_samples_per_bar(44100, 120.0, 4);
+        bar_3_sample := 2 * samples_per_bar;
+        seek_sequencer_clock(*sequencer.clock, bar_3_sample);
+
+        render_sequencer_block(sequencer, *song_specification, voice_manager, mixer, output_buffer, 512);
+
+        expect_near(channel.gain, 0.5, 0.02);
+        expect_near(channel.pan, 0.0, 0.02);
+        expect_near(channel.filter_insert.resonance, 0.5, 0.02);
+        expect_near(channel.send_levels[0], 0.375, 0.02);
+        expect_near(mixer.master.gain, 0.75, 0.02);
+        expect_near(sequencer.clock.beats_per_minute, 130.0, 1.0);
+
+        bar_5_sample := 4 * samples_per_bar;
+        seek_sequencer_clock(*sequencer.clock, bar_5_sample);
+
+        render_sequencer_block(sequencer, *song_specification, voice_manager, mixer, output_buffer, 512);
+
+        expect_near(channel.gain, 1.0, 0.01);
+        expect_near(channel.pan, 1.0, 0.01);
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, 8000.0, 10.0);
+        expect_near(channel.filter_insert.resonance, 0.8, 0.01);
+        expect_near(channel.send_levels[0], 0.75, 0.01);
+        expect_near(mixer.master.gain, 1.0, 0.01);
+        expect_near(sequencer.clock.beats_per_minute, 140.0, 0.5);
+    });
 }
 

@@ -200,6 +200,20 @@ configure_mixer_from_definition :: (mixer: *Mixer, mixer_definition: Mixer_Defin
                 );
             }
 
+            if track_definition.filter_enabled {
+                channel.filter_enabled = true;
+                filter_type := track_definition.filter_type;
+                if filter_type == .NONE {
+                    filter_type = .LOWPASS;
+                }
+                configure_filter_insert(
+                    *channel.filter_insert,
+                    filter_type,
+                    track_definition.filter_cutoff_frequency_hertz,
+                    track_definition.filter_resonance
+                );
+            }
+
             send_index := 0;
             while send_index < MAXIMUM_AUX_TRACKS {
                 channel.send_levels[send_index] = track_definition.send_levels[send_index];

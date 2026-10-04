@@ -128,9 +128,9 @@
     - `automate track 1.filter_cutoff from 200 to 8000 over bar 9-16 curve=exponential`
     - `automate track 2.gain from -inf to 0dB over bar 1-4 curve=linear`
     - `automate tempo from 120 to 140 over bar 16-17`
-- [ ] **15.2 Timeline Curve Interpolation (`src/engine/sequencer.jai`)**
-  - [ ] Linear, exponential, and logarithmic curve shapes calculated sample-accurately during block rendering.
-  - [ ] Target parameters: Channel Gain, Pan, Filter Cutoff/Resonance, Send Levels, and Master Tempo.
+- [x] **15.2 Timeline Curve Interpolation (`src/engine/sequencer.jai`)**
+  - [x] Linear, exponential, and logarithmic curve shapes calculated sample-accurately during block rendering.
+  - [x] Target parameters: Channel Gain, Pan, Filter Cutoff/Resonance, Send Levels, and Master Tempo.
 - [ ] **15.3 Live Hot-Reload Verification**
   - [ ] Editing automation points in real time updates the playback curves smoothly without audio clicks.
 

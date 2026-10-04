@@ -675,8 +675,314 @@ dispatch_sequencer_event :: (event: *Sequencer_Event, song_specification: *Song_
     }
 }
 
+evaluate_automation_curve_normalized :: (curve_type: Automation_Curve_Type, normalized_time: float) -> float {
+    clamped_time := clamp(normalized_time, 0.0, 1.0);
+
+    if curve_type == {
+        case .LINEAR;
+            return clamped_time;
+
+        case .EXPONENTIAL;
+            curve_steepness :: 3.0;
+            denominator := exp(curve_steepness) - 1.0;
+            return (exp(curve_steepness * clamped_time) - 1.0) / denominator;
+
+        case .LOGARITHMIC;
+            curve_steepness :: 3.0;
+            denominator := exp(curve_steepness) - 1.0;
+            inverted_exponential := (exp(curve_steepness * (1.0 - clamped_time)) - 1.0) / denominator;
+            return 1.0 - inverted_exponential;
+    }
+
+    return clamped_time;
+}
+
+interpolate_automation_value :: (curve: *Automation_Curve_Definition, normalized_time: float) -> float {
+    clamped_time := clamp(normalized_time, 0.0, 1.0);
+
+    if curve.curve_type == {
+        case .LINEAR;
+            return curve.start_value + (curve.end_value - curve.start_value) * clamped_time;
+
+        case .EXPONENTIAL;
+            if curve.target_type == .TRACK_FILTER_CUTOFF && curve.start_value > 0.0001 && curve.end_value > 0.0001 {
+                ratio := curve.end_value / curve.start_value;
+                return curve.start_value * pow(ratio, clamped_time);
+            }
+
+            normalized_exponential := evaluate_automation_curve_normalized(.EXPONENTIAL, clamped_time);
+            return curve.start_value + (curve.end_value - curve.start_value) * normalized_exponential;
+
+        case .LOGARITHMIC;
+            normalized_logarithmic := evaluate_automation_curve_normalized(.LOGARITHMIC, clamped_time);
+            return curve.start_value + (curve.end_value - curve.start_value) * normalized_logarithmic;
+    }
+
+    return curve.start_value + (curve.end_value - curve.start_value) * clamped_time;
+}
+
+evaluate_automation_curve_at_sample :: (curve: *Automation_Curve_Definition, sample_position: u64, sample_rate: s64, beats_per_minute: float, time_signature_numerator: s64 = 4) -> float {
+    samples_per_bar := calculate_samples_per_bar(sample_rate, beats_per_minute, time_signature_numerator);
+    if samples_per_bar <= 0.0 {
+        return curve.start_value;
+    }
+
+    curve_start_sample := cast(float64)(curve.start_bar - 1) * samples_per_bar;
+    curve_end_sample := cast(float64) curve.end_bar * samples_per_bar;
+    duration_samples := curve_end_sample - curve_start_sample;
+
+    if duration_samples <= 0.0 {
+        return curve.end_value;
+    }
+
+    current_sample_float := cast(float64) sample_position;
+    if current_sample_float <= curve_start_sample {
+        return curve.start_value;
+    }
+
+    if current_sample_float >= curve_end_sample {
+        return curve.end_value;
+    }
+
+    normalized_time := cast(float) ((current_sample_float - curve_start_sample) / duration_samples);
+
+    return interpolate_automation_value(curve, normalized_time);
+}
+
+evaluate_automation_target :: (
+    song_specification: *Song_Specification,
+    target_type: Automation_Target_Type,
+    track_index: s64 = 1,
+    aux_send_index: s64 = 1,
+    sample_position: u64 = 0,
+    sample_rate: s64 = DEFAULT_SAMPLE_RATE,
+    beats_per_minute: float = 120.0,
+    time_signature_numerator: s64 = 4
+) -> float, bool {
+    matching_curve_indices: [..] s64;
+    curve_index := 0;
+    while curve_index < song_specification.automation.curves.count {
+        curve := *song_specification.automation.curves[curve_index];
+        if curve.target_type == target_type {
+            if target_type == .TRACK_GAIN || target_type == .TRACK_PAN || target_type == .TRACK_FILTER_CUTOFF || target_type == .TRACK_FILTER_RESONANCE || target_type == .TRACK_SEND {
+                if curve.track_index == track_index {
+                    if target_type == .TRACK_SEND {
+                        if curve.aux_send_index == aux_send_index {
+                            array_add(*matching_curve_indices, curve_index);
+                        }
+                    } else {
+                        array_add(*matching_curve_indices, curve_index);
+                    }
+                }
+            } else {
+                array_add(*matching_curve_indices, curve_index);
+            }
+        }
+
+        curve_index += 1;
+    }
+
+    if matching_curve_indices.count == 0 {
+        return 0.0, false;
+    }
+
+    samples_per_bar := calculate_samples_per_bar(sample_rate, beats_per_minute, time_signature_numerator);
+    current_sample_float := cast(float64) sample_position;
+
+    match_index := 0;
+    while match_index < matching_curve_indices.count {
+        matched_index := matching_curve_indices[match_index];
+        curve := *song_specification.automation.curves[matched_index];
+        curve_start_sample := cast(float64)(curve.start_bar - 1) * samples_per_bar;
+        curve_end_sample := cast(float64) curve.end_bar * samples_per_bar;
+
+        if current_sample_float >= curve_start_sample && current_sample_float <= curve_end_sample {
+            interpolated_value := evaluate_automation_curve_at_sample(curve, sample_position, sample_rate, beats_per_minute, time_signature_numerator);
+            return interpolated_value, true;
+        }
+
+        match_index += 1;
+    }
+
+    first_curve := *song_specification.automation.curves[matching_curve_indices[0]];
+    first_start_sample := cast(float64)(first_curve.start_bar - 1) * samples_per_bar;
+    if current_sample_float < first_start_sample {
+        return first_curve.start_value, true;
+    }
+
+    last_ended_curve := first_curve;
+    match_index = 0;
+    while match_index < matching_curve_indices.count {
+        matched_index := matching_curve_indices[match_index];
+        curve := *song_specification.automation.curves[matched_index];
+        curve_end_sample := cast(float64) curve.end_bar * samples_per_bar;
+
+        if curve_end_sample <= current_sample_float {
+            last_ended_curve = curve;
+        }
+
+        match_index += 1;
+    }
+
+    return last_ended_curve.end_value, true;
+}
+
+apply_song_automation :: (
+    sequencer: *Sequencer,
+    song_specification: *Song_Specification,
+    mixer: *Mixer,
+    voice_manager: *Voice_Manager,
+    current_sample: u64
+) {
+    if song_specification.automation.curves.count == 0 {
+        return;
+    }
+
+    sample_rate := sequencer.clock.sample_rate;
+    base_tempo := song_specification.project.beats_per_minute;
+    time_signature_numerator := sequencer.clock.time_signature_numerator;
+
+    automated_tempo, tempo_found := evaluate_automation_target(
+        song_specification,
+        .TEMPO,
+        sample_position = current_sample,
+        sample_rate = sample_rate,
+        beats_per_minute = base_tempo,
+        time_signature_numerator = time_signature_numerator
+    );
+
+    effective_tempo := base_tempo;
+    if tempo_found && automated_tempo > 0.0 {
+        effective_tempo = automated_tempo;
+        sequencer.clock.beats_per_minute = automated_tempo;
+        mixer.beats_per_minute = automated_tempo;
+        voice_manager.beats_per_minute = automated_tempo;
+    }
+
+    curve_index := 0;
+    while curve_index < song_specification.automation.curves.count {
+        curve := *song_specification.automation.curves[curve_index];
+
+        if curve.target_type == {
+            case .TRACK_GAIN;
+                channel, channel_found := find_mixer_channel(mixer, curve.track_index);
+                if channel_found {
+                    automated_gain, gain_found := evaluate_automation_target(
+                        song_specification,
+                        .TRACK_GAIN,
+                        track_index = curve.track_index,
+                        sample_position = current_sample,
+                        sample_rate = sample_rate,
+                        beats_per_minute = base_tempo,
+                        time_signature_numerator = time_signature_numerator
+                    );
+                    if gain_found {
+                        channel.gain = automated_gain;
+                    }
+                }
+
+            case .TRACK_PAN;
+                channel, channel_found := find_mixer_channel(mixer, curve.track_index);
+                if channel_found {
+                    automated_pan, pan_found := evaluate_automation_target(
+                        song_specification,
+                        .TRACK_PAN,
+                        track_index = curve.track_index,
+                        sample_position = current_sample,
+                        sample_rate = sample_rate,
+                        beats_per_minute = base_tempo,
+                        time_signature_numerator = time_signature_numerator
+                    );
+                    if pan_found {
+                        channel.pan = automated_pan;
+                    }
+                }
+
+            case .TRACK_FILTER_CUTOFF;
+                channel, channel_found := find_mixer_channel(mixer, curve.track_index);
+                if channel_found {
+                    automated_cutoff, cutoff_found := evaluate_automation_target(
+                        song_specification,
+                        .TRACK_FILTER_CUTOFF,
+                        track_index = curve.track_index,
+                        sample_position = current_sample,
+                        sample_rate = sample_rate,
+                        beats_per_minute = base_tempo,
+                        time_signature_numerator = time_signature_numerator
+                    );
+                    if cutoff_found {
+                        channel.filter_enabled = true;
+                        filter_type := channel.filter_insert.filter_type;
+                        if filter_type == .NONE {
+                            filter_type = .LOWPASS;
+                        }
+                        configure_filter_insert(*channel.filter_insert, filter_type, automated_cutoff, channel.filter_insert.resonance);
+                    }
+                }
+
+            case .TRACK_FILTER_RESONANCE;
+                channel, channel_found := find_mixer_channel(mixer, curve.track_index);
+                if channel_found {
+                    automated_resonance, resonance_found := evaluate_automation_target(
+                        song_specification,
+                        .TRACK_FILTER_RESONANCE,
+                        track_index = curve.track_index,
+                        sample_position = current_sample,
+                        sample_rate = sample_rate,
+                        beats_per_minute = base_tempo,
+                        time_signature_numerator = time_signature_numerator
+                    );
+                    if resonance_found {
+                        channel.filter_enabled = true;
+                        filter_type := channel.filter_insert.filter_type;
+                        if filter_type == .NONE {
+                            filter_type = .LOWPASS;
+                        }
+                        configure_filter_insert(*channel.filter_insert, filter_type, channel.filter_insert.cutoff_frequency_hertz, automated_resonance);
+                    }
+                }
+
+            case .TRACK_SEND;
+                channel, channel_found := find_mixer_channel(mixer, curve.track_index);
+                if channel_found && curve.aux_send_index >= 1 && curve.aux_send_index <= MAXIMUM_AUX_TRACKS {
+                    automated_send, send_found := evaluate_automation_target(
+                        song_specification,
+                        .TRACK_SEND,
+                        track_index = curve.track_index,
+                        aux_send_index = curve.aux_send_index,
+                        sample_position = current_sample,
+                        sample_rate = sample_rate,
+                        beats_per_minute = base_tempo,
+                        time_signature_numerator = time_signature_numerator
+                    );
+                    if send_found {
+                        channel.send_levels[curve.aux_send_index - 1] = automated_send;
+                    }
+                }
+
+            case .MASTER_GAIN;
+                automated_master_gain, master_gain_found := evaluate_automation_target(
+                    song_specification,
+                    .MASTER_GAIN,
+                    sample_position = current_sample,
+                    sample_rate = sample_rate,
+                    beats_per_minute = base_tempo,
+                    time_signature_numerator = time_signature_numerator
+                );
+                if master_gain_found {
+                    mixer.master.gain = automated_master_gain;
+                }
+
+            case .TEMPO;
+        }
+
+        curve_index += 1;
+    }
+}
+
 render_sequencer_block :: (sequencer: *Sequencer, song_specification: *Song_Specification, voice_manager: *Voice_Manager, mixer: *Mixer, output_buffer: [] float, frame_count: s64) {
-    voice_manager.beats_per_minute = song_specification.project.beats_per_minute;
+    apply_song_automation(sequencer, song_specification, mixer, voice_manager, sequencer.clock.current_sample);
+    voice_manager.beats_per_minute = sequencer.clock.beats_per_minute;
     clear_channel_buffers(mixer, frame_count);
     collect_sequencer_events_for_block(sequencer, song_specification, frame_count);
 
