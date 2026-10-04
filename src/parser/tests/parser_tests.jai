@@ -615,5 +615,197 @@ END;
         expect_equals(rhodes.sampler.root_midi_note, 57);
         expect_equals(rhodes.sampler.interpolation, Sampler_Interpolation_Mode.LINEAR);
     });
+
+    test("automation section parsing and curve attributes", () {
+        song_text := #string END
+[project]
+name = "Automation Test"
+bpm = 120
+bars = 36
+
+[instruments]
+lead = synth(wave="saw")
+
+[pattern main]
+lead | x . . . |
+
+[mixer]
+track 1: gain = 1.0, pan = 0.0
+track 2: gain = 0.8, pan = 0.0
+master: gain = 1.0
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1-36: main
+
+[automation]
+automate track 1.filter_cutoff from 200 to 8000 over bar 9-16 curve=exponential
+automate track 2.gain from -inf to 0dB over bar 1-4 curve=linear
+automate tempo from 120 to 140 over bar 16-17
+track 1.pan from left to right over bar 1-8 curve=logarithmic
+track 1.resonance from 0.2 to 0.85 over bar 9-16
+master.gain from 0dB to -12dB over bar 33-36 curve=exponential
+track 1.send 1 from -inf to 0dB over bar 1-8
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "automation_test.song", check_samples_on_disk = false);
+        expect_true(success);
+        expect_equals(song_specification.automation.curves.count, 7);
+
+        curve_1 := *song_specification.automation.curves[0];
+        expect_equals(curve_1.target_type, Automation_Target_Type.TRACK_FILTER_CUTOFF);
+        expect_equals(curve_1.track_index, 1);
+        expect_near(curve_1.start_value, 200.0, 0.001);
+        expect_near(curve_1.end_value, 8000.0, 0.001);
+        expect_equals(curve_1.start_bar, 9);
+        expect_equals(curve_1.end_bar, 16);
+        expect_equals(curve_1.curve_type, Automation_Curve_Type.EXPONENTIAL);
+
+        curve_2 := *song_specification.automation.curves[1];
+        expect_equals(curve_2.target_type, Automation_Target_Type.TRACK_GAIN);
+        expect_equals(curve_2.track_index, 2);
+        expect_near(curve_2.start_value, 0.0, 0.001);
+        expect_near(curve_2.end_value, 1.0, 0.001);
+        expect_equals(curve_2.start_bar, 1);
+        expect_equals(curve_2.end_bar, 4);
+        expect_equals(curve_2.curve_type, Automation_Curve_Type.LINEAR);
+
+        curve_3 := *song_specification.automation.curves[2];
+        expect_equals(curve_3.target_type, Automation_Target_Type.TEMPO);
+        expect_near(curve_3.start_value, 120.0, 0.001);
+        expect_near(curve_3.end_value, 140.0, 0.001);
+        expect_equals(curve_3.start_bar, 16);
+        expect_equals(curve_3.end_bar, 17);
+        expect_equals(curve_3.curve_type, Automation_Curve_Type.LINEAR);
+
+        curve_4 := *song_specification.automation.curves[3];
+        expect_equals(curve_4.target_type, Automation_Target_Type.TRACK_PAN);
+        expect_equals(curve_4.track_index, 1);
+        expect_near(curve_4.start_value, -1.0, 0.001);
+        expect_near(curve_4.end_value, 1.0, 0.001);
+        expect_equals(curve_4.start_bar, 1);
+        expect_equals(curve_4.end_bar, 8);
+        expect_equals(curve_4.curve_type, Automation_Curve_Type.LOGARITHMIC);
+
+        curve_5 := *song_specification.automation.curves[4];
+        expect_equals(curve_5.target_type, Automation_Target_Type.TRACK_FILTER_RESONANCE);
+        expect_equals(curve_5.track_index, 1);
+        expect_near(curve_5.start_value, 0.2, 0.001);
+        expect_near(curve_5.end_value, 0.85, 0.001);
+        expect_equals(curve_5.start_bar, 9);
+        expect_equals(curve_5.end_bar, 16);
+
+        curve_6 := *song_specification.automation.curves[5];
+        expect_equals(curve_6.target_type, Automation_Target_Type.MASTER_GAIN);
+        expect_near(curve_6.start_value, 1.0, 0.001);
+        expect_near(curve_6.end_value, decibels_to_linear(-12.0), 0.001);
+        expect_equals(curve_6.start_bar, 33);
+        expect_equals(curve_6.end_bar, 36);
+        expect_equals(curve_6.curve_type, Automation_Curve_Type.EXPONENTIAL);
+
+        curve_7 := *song_specification.automation.curves[6];
+        expect_equals(curve_7.target_type, Automation_Target_Type.TRACK_SEND);
+        expect_equals(curve_7.track_index, 1);
+        expect_equals(curve_7.aux_send_index, 1);
+        expect_near(curve_7.start_value, 0.0, 0.001);
+        expect_near(curve_7.end_value, 1.0, 0.001);
+        expect_equals(curve_7.start_bar, 1);
+        expect_equals(curve_7.end_bar, 8);
+    });
+
+    test("inline arrangement automation parsing and track resolution", () {
+        song_text := #string END
+[project]
+name = "Inline Automation"
+bpm = 128
+bars = 16
+
+[instruments]
+lead = synth(wave="saw")
+
+[pattern verse]
+lead | x . . . |
+
+[pattern chorus]
+lead | x . x . |
+
+[channel_routing]
+lead -> track 2
+
+[arrangement]
+bar 1-8: verse
+automate track lead.filter_cutoff from 200Hz to 8kHz over bar 5-8 curve=exponential
+bar 9-16: chorus
+automate tempo from 120 to 140 over bar 16-17
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "inline_automation.song", check_samples_on_disk = false);
+        expect_true(success);
+        expect_equals(song_specification.arrangement.clips.count, 2);
+        expect_equals(song_specification.automation.curves.count, 2);
+
+        curve_1 := *song_specification.automation.curves[0];
+        expect_equals(curve_1.target_type, Automation_Target_Type.TRACK_FILTER_CUTOFF);
+        expect_equals(curve_1.track_index, 2);
+        expect_near(curve_1.start_value, 200.0, 0.001);
+        expect_near(curve_1.end_value, 8000.0, 0.001);
+        expect_equals(curve_1.start_bar, 5);
+        expect_equals(curve_1.end_bar, 8);
+        expect_equals(curve_1.curve_type, Automation_Curve_Type.EXPONENTIAL);
+
+        curve_2 := *song_specification.automation.curves[1];
+        expect_equals(curve_2.target_type, Automation_Target_Type.TEMPO);
+        expect_near(curve_2.start_value, 120.0, 0.001);
+        expect_near(curve_2.end_value, 140.0, 0.001);
+        expect_equals(curve_2.start_bar, 16);
+        expect_equals(curve_2.end_bar, 17);
+    });
+
+    test("automation semantic validation errors", () {
+        invalid_track_song := #string END
+[project]
+name = "Invalid Track Automation"
+bpm = 120
+bars = 8
+
+[pattern p1]
+lead | x . . . |
+
+[instruments]
+lead = synth(wave="saw")
+
+[arrangement]
+bar 1-8: p1
+automate track ghost.gain from 0dB to -6dB over bar 1-4
+END;
+
+        _, track_success, _ := parse_song(invalid_track_song, "invalid_track.song", check_samples_on_disk = false);
+        expect_true(!track_success);
+
+        invalid_bars_song := #string END
+[project]
+name = "Invalid Bars Automation"
+bpm = 120
+bars = 8
+
+[pattern p1]
+lead | x . . . |
+
+[instruments]
+lead = synth(wave="saw")
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1-8: p1
+automate track 1.gain from 0dB to -6dB over bar 8-4
+END;
+
+        _, bars_success, _ := parse_song(invalid_bars_song, "invalid_bars.song", check_samples_on_disk = false);
+        expect_true(!bars_success);
+    });
 }
 

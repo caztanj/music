@@ -208,6 +208,37 @@ string_to_sampler_interpolation_mode :: (name: string) -> Sampler_Interpolation_
     return .CUBIC, false;
 }
 
+string_to_automation_curve_type :: (name: string) -> Automation_Curve_Type, bool {
+    if name == "exponential" || name == "exp" {
+        return .EXPONENTIAL, true;
+    }
+
+    if name == "logarithmic" || name == "log" {
+        return .LOGARITHMIC, true;
+    }
+
+    if name == "linear" || name == "lin" {
+        return .LINEAR, true;
+    }
+
+    return .LINEAR, false;
+}
+
+automation_curve_type_to_string :: (curve_type: Automation_Curve_Type) -> string {
+    if curve_type == {
+        case .EXPONENTIAL;
+            return "exponential";
+
+        case .LOGARITHMIC;
+            return "logarithmic";
+
+        case .LINEAR;
+            return "linear";
+    }
+
+    return "linear";
+}
+
 waveform_type_to_string :: (waveform_type: Waveform_Type) -> string {
     if waveform_type == {
         case .SAWTOOTH;
@@ -581,6 +612,10 @@ Mixer_Track_Definition :: struct {
     name: string;
     gain: float = 1.0;
     pan: float = 0.0;
+    filter_enabled: bool = false;
+    filter_type: Filter_Type = .LOWPASS;
+    filter_cutoff_frequency_hertz: float = 20000.0;
+    filter_resonance: float = 0.707;
     delay_time_seconds: float = 0.0;
     delay_feedback: float = 0.0;
     reverb_enabled: bool = false;
@@ -736,6 +771,40 @@ Arrangement_Definition :: struct {
     location: Source_Location;
 }
 
+Automation_Target_Type :: enum {
+    TRACK_GAIN;
+    TRACK_PAN;
+    TRACK_FILTER_CUTOFF;
+    TRACK_FILTER_RESONANCE;
+    TRACK_SEND;
+    MASTER_GAIN;
+    TEMPO;
+}
+
+Automation_Curve_Type :: enum {
+    LINEAR;
+    EXPONENTIAL;
+    LOGARITHMIC;
+}
+
+Automation_Curve_Definition :: struct {
+    target_type: Automation_Target_Type = .TRACK_GAIN;
+    track_index: s64 = 1;
+    track_name: string;
+    aux_send_index: s64 = 1;
+    start_value: float = 0.0;
+    end_value: float = 1.0;
+    start_bar: s64 = 1;
+    end_bar: s64 = 1;
+    curve_type: Automation_Curve_Type = .LINEAR;
+    location: Source_Location;
+}
+
+Automation_Definition :: struct {
+    curves: [..] Automation_Curve_Definition;
+    location: Source_Location;
+}
+
 Song_Specification :: struct {
     project: Project_Configuration;
     instruments: [..] Instrument_Definition;
@@ -743,4 +812,5 @@ Song_Specification :: struct {
     mixer: Mixer_Definition;
     routings: [..] Routing_Definition;
     arrangement: Arrangement_Definition;
+    automation: Automation_Definition;
 }

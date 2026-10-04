@@ -182,6 +182,12 @@ parse_entire_song :: (parser: *Parser, song_specification: *Song_Specification) 
 
             success := parse_arrangement_section(parser, song_specification);
             if !success return false;
+        } else if section_name == "automation" {
+            close_token, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' after automation section header");
+            if !close_success return false;
+
+            success := parse_automation_section(parser, song_specification);
+            if !success return false;
         } else {
             set_error(parser, section_token.location, sprint("Unknown section '[%]'", section_name));
             return false;
@@ -1836,6 +1842,39 @@ parse_mixer_track_parameters :: (parser: *Parser, track: *Mixer_Track_Definition
             pan_value, pan_success := parse_number(parser);
             if !pan_success return false;
             track.pan = cast(float) pan_value;
+        } else if parameter_name == "filter" || parameter_name == "filter_type" {
+            type_token := current_token(parser);
+            if type_token.type != .IDENTIFIER && type_token.type != .STRING {
+                set_error(parser, type_token.location, "Expected filter type name ('lowpass', 'highpass', 'bandpass')");
+                return false;
+            }
+            type_text := ifx type_token.type == .STRING then type_token.string_value else type_token.text;
+            filter_type, filter_found := string_to_filter_type(type_text);
+            if !filter_found {
+                set_error(parser, type_token.location, sprint("Unknown filter type '%'", type_text));
+                return false;
+            }
+            track.filter_type = filter_type;
+            track.filter_enabled = true;
+            advance_token(parser);
+        } else if parameter_name == "cutoff" || parameter_name == "filter_cutoff" || parameter_name == "filter_cutoff_frequency" {
+            cutoff_value, cutoff_success := parse_number(parser);
+            if !cutoff_success return false;
+            cutoff_hertz := cast(float) cutoff_value;
+            unit_token := current_token(parser);
+            if unit_token.type == .IDENTIFIER && (unit_token.text == "khz" || unit_token.text == "kHz") {
+                cutoff_hertz *= 1000.0;
+                advance_token(parser);
+            } else if unit_token.type == .IDENTIFIER && (unit_token.text == "hz" || unit_token.text == "Hz") {
+                advance_token(parser);
+            }
+            track.filter_cutoff_frequency_hertz = cutoff_hertz;
+            track.filter_enabled = true;
+        } else if parameter_name == "resonance" || parameter_name == "filter_resonance" || parameter_name == "res" || parameter_name == "filter_res" || parameter_name == "q" {
+            resonance_value, resonance_success := parse_number(parser);
+            if !resonance_success return false;
+            track.filter_resonance = cast(float) resonance_value;
+            track.filter_enabled = true;
         } else if parameter_name == "delay" {
             delay_value, delay_success := parse_number(parser);
             if !delay_success return false;
@@ -2695,6 +2734,14 @@ parse_arrangement_section :: (parser: *Parser, song_specification: *Song_Specifi
             break;
         }
 
+        if token.type == .IDENTIFIER && token.text == "automate" {
+            curve, curve_success := parse_automation_line(parser, song_specification);
+            if !curve_success return false;
+
+            array_add(*song_specification.automation.curves, curve);
+            continue;
+        }
+
         if token.type != .IDENTIFIER || token.text != "bar" {
             set_error(parser, token.location, sprint("Expected 'bar' in [arrangement], got '%'", token.text));
             return false;
@@ -2738,6 +2785,360 @@ parse_arrangement_section :: (parser: *Parser, song_specification: *Song_Specifi
     }
 
     return true;
+}
+
+parse_automation_section :: (parser: *Parser, song_specification: *Song_Specification) -> bool {
+    song_specification.automation.location = current_token(parser).location;
+
+    while !parser.has_error && parser.current_token_index < parser.tokens.count {
+        skip_newlines(parser);
+        token := current_token(parser);
+
+        if token.type == .OPEN_BRACKET || token.type == .END_OF_FILE {
+            break;
+        }
+
+        curve, curve_success := parse_automation_line(parser, song_specification);
+        if !curve_success return false;
+
+        array_add(*song_specification.automation.curves, curve);
+    }
+
+    return true;
+}
+
+parse_automation_line :: (parser: *Parser, song_specification: *Song_Specification) -> Automation_Curve_Definition, bool {
+    curve: Automation_Curve_Definition;
+    line_location := current_token(parser).location;
+    curve.location = line_location;
+
+    if current_token(parser).type == .IDENTIFIER && current_token(parser).text == "automate" {
+        advance_token(parser);
+    }
+
+    target_token := current_token(parser);
+    if target_token.type != .IDENTIFIER {
+        set_error(parser, target_token.location, sprint("Expected automation target, got '%'", target_token.text));
+        return curve, false;
+    }
+
+    if target_token.text == "tempo" || target_token.text == "bpm" || target_token.text == "beats_per_minute" {
+        curve.target_type = .TEMPO;
+        advance_token(parser);
+    } else if target_token.text == "master" {
+        advance_token(parser);
+        if current_token(parser).type == .DOT {
+            advance_token(parser);
+        }
+        property_token := current_token(parser);
+        if property_token.type != .IDENTIFIER {
+            set_error(parser, property_token.location, "Expected property name after 'master'");
+            return curve, false;
+        }
+        if property_token.text == "gain" || property_token.text == "volume" || property_token.text == "vol" {
+            curve.target_type = .MASTER_GAIN;
+            advance_token(parser);
+        } else {
+            set_error(parser, property_token.location, sprint("Unknown master automation property '%'", property_token.text));
+            return curve, false;
+        }
+    } else if target_token.text == "track" {
+        advance_token(parser);
+        track_reference_token := current_token(parser);
+        if track_reference_token.type == .INTEGER {
+            curve.track_index = track_reference_token.integer_value;
+            advance_token(parser);
+        } else if track_reference_token.type == .IDENTIFIER || track_reference_token.type == .STRING {
+            curve.track_name = ifx track_reference_token.type == .STRING then track_reference_token.string_value else track_reference_token.text;
+            curve.track_index = 0;
+            advance_token(parser);
+        } else {
+            set_error(parser, track_reference_token.location, "Expected track index or name after 'track'");
+            return curve, false;
+        }
+
+        dot_token, dot_success := consume_token(parser, .DOT, "Expected '.' after track specification in automation");
+        if !dot_success return curve, false;
+
+        property_token := current_token(parser);
+        if property_token.type != .IDENTIFIER {
+            set_error(parser, property_token.location, "Expected property name after '.' in track automation");
+            return curve, false;
+        }
+
+        property_name := property_token.text;
+        advance_token(parser);
+
+        if property_name == "filter_cutoff" || property_name == "cutoff" {
+            curve.target_type = .TRACK_FILTER_CUTOFF;
+        } else if property_name == "filter_resonance" || property_name == "resonance" || property_name == "filter_res" || property_name == "res" || property_name == "filter_q" || property_name == "q" {
+            curve.target_type = .TRACK_FILTER_RESONANCE;
+        } else if property_name == "gain" || property_name == "volume" || property_name == "vol" {
+            curve.target_type = .TRACK_GAIN;
+        } else if property_name == "pan" || property_name == "panning" {
+            curve.target_type = .TRACK_PAN;
+        } else if property_name == "send" || property_name == "send_1" || property_name == "send_2" || property_name == "send_3" || property_name == "send_4" {
+            curve.target_type = .TRACK_SEND;
+            if property_name == "send_1" {
+                curve.aux_send_index = 1;
+            } else if property_name == "send_2" {
+                curve.aux_send_index = 2;
+            } else if property_name == "send_3" {
+                curve.aux_send_index = 3;
+            } else if property_name == "send_4" {
+                curve.aux_send_index = 4;
+            } else {
+                if current_token(parser).type == .DOT {
+                    advance_token(parser);
+                    send_index_token, send_index_success := consume_token(parser, .INTEGER, "Expected aux send index after 'send.'");
+                    if !send_index_success return curve, false;
+                    curve.aux_send_index = send_index_token.integer_value;
+                } else if current_token(parser).type == .INTEGER {
+                    send_index_token := current_token(parser);
+                    curve.aux_send_index = send_index_token.integer_value;
+                    advance_token(parser);
+                } else {
+                    curve.aux_send_index = 1;
+                }
+            }
+        } else {
+            set_error(parser, property_token.location, sprint("Unknown track automation property '%'", property_name));
+            return curve, false;
+        }
+    } else {
+        if peek_token(parser, 1).type == .DOT {
+            curve.track_name = target_token.text;
+            curve.track_index = 0;
+            advance_token(parser);
+            advance_token(parser);
+
+            property_token := current_token(parser);
+            if property_token.type != .IDENTIFIER {
+                set_error(parser, property_token.location, "Expected property name after '.' in track automation");
+                return curve, false;
+            }
+
+            property_name := property_token.text;
+            advance_token(parser);
+
+            if property_name == "filter_cutoff" || property_name == "cutoff" {
+                curve.target_type = .TRACK_FILTER_CUTOFF;
+            } else if property_name == "filter_resonance" || property_name == "resonance" || property_name == "filter_res" || property_name == "res" || property_name == "filter_q" || property_name == "q" {
+                curve.target_type = .TRACK_FILTER_RESONANCE;
+            } else if property_name == "gain" || property_name == "volume" || property_name == "vol" {
+                curve.target_type = .TRACK_GAIN;
+            } else if property_name == "pan" || property_name == "panning" {
+                curve.target_type = .TRACK_PAN;
+            } else if property_name == "send" || property_name == "send_1" || property_name == "send_2" || property_name == "send_3" || property_name == "send_4" {
+                curve.target_type = .TRACK_SEND;
+                if property_name == "send_1" {
+                    curve.aux_send_index = 1;
+                } else if property_name == "send_2" {
+                    curve.aux_send_index = 2;
+                } else if property_name == "send_3" {
+                    curve.aux_send_index = 3;
+                } else if property_name == "send_4" {
+                    curve.aux_send_index = 4;
+                } else {
+                    if current_token(parser).type == .DOT {
+                        advance_token(parser);
+                        send_index_token, send_index_success := consume_token(parser, .INTEGER, "Expected aux send index after 'send.'");
+                        if !send_index_success return curve, false;
+                        curve.aux_send_index = send_index_token.integer_value;
+                    } else if current_token(parser).type == .INTEGER {
+                        send_index_token := current_token(parser);
+                        curve.aux_send_index = send_index_token.integer_value;
+                        advance_token(parser);
+                    } else {
+                        curve.aux_send_index = 1;
+                    }
+                }
+            } else {
+                set_error(parser, property_token.location, sprint("Unknown track automation property '%'", property_name));
+                return curve, false;
+            }
+        } else {
+            set_error(parser, target_token.location, sprint("Unknown automation target '%'", target_token.text));
+            return curve, false;
+        }
+    }
+
+    from_token := current_token(parser);
+    if from_token.type != .IDENTIFIER || from_token.text != "from" {
+        set_error(parser, from_token.location, sprint("Expected 'from' in automation line, got '%'", from_token.text));
+        return curve, false;
+    }
+    advance_token(parser);
+
+    start_value, start_value_success := parse_automation_value(parser, curve.target_type);
+    if !start_value_success return curve, false;
+    curve.start_value = start_value;
+
+    to_token := current_token(parser);
+    if to_token.type != .IDENTIFIER || to_token.text != "to" {
+        set_error(parser, to_token.location, sprint("Expected 'to' in automation line, got '%'", to_token.text));
+        return curve, false;
+    }
+    advance_token(parser);
+
+    end_value, end_value_success := parse_automation_value(parser, curve.target_type);
+    if !end_value_success return curve, false;
+    curve.end_value = end_value;
+
+    if current_token(parser).type == .IDENTIFIER && current_token(parser).text == "over" {
+        advance_token(parser);
+    }
+
+    if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "bar" || current_token(parser).text == "bars") {
+        advance_token(parser);
+    }
+
+    start_bar_token, start_bar_success := consume_token(parser, .INTEGER, "Expected starting bar number in automation line");
+    if !start_bar_success return curve, false;
+
+    curve.start_bar = start_bar_token.integer_value;
+    curve.end_bar = curve.start_bar;
+
+    if current_token(parser).type == .MINUS {
+        advance_token(parser);
+        end_bar_token, end_bar_success := consume_token(parser, .INTEGER, "Expected ending bar number after '-' in automation");
+        if !end_bar_success return curve, false;
+        curve.end_bar = end_bar_token.integer_value;
+    } else if current_token(parser).type == .IDENTIFIER && current_token(parser).text == "to" {
+        advance_token(parser);
+        end_bar_token, end_bar_success := consume_token(parser, .INTEGER, "Expected ending bar number after 'to' in automation");
+        if !end_bar_success return curve, false;
+        curve.end_bar = end_bar_token.integer_value;
+    }
+
+    curve.curve_type = .LINEAR;
+
+    if current_token(parser).type == .IDENTIFIER {
+        if current_token(parser).text == "curve" {
+            advance_token(parser);
+            if current_token(parser).type == .EQUALS || current_token(parser).type == .COLON {
+                advance_token(parser);
+            }
+            shape_token := current_token(parser);
+            if shape_token.type != .IDENTIFIER {
+                set_error(parser, shape_token.location, "Expected curve shape name ('linear', 'exponential', 'logarithmic')");
+                return curve, false;
+            }
+            parsed_curve_type, curve_type_found := string_to_automation_curve_type(shape_token.text);
+            if !curve_type_found {
+                set_error(parser, shape_token.location, sprint("Unknown automation curve type '%'", shape_token.text));
+                return curve, false;
+            }
+            curve.curve_type = parsed_curve_type;
+            advance_token(parser);
+        } else {
+            parsed_curve_type, curve_type_found := string_to_automation_curve_type(current_token(parser).text);
+            if curve_type_found {
+                curve.curve_type = parsed_curve_type;
+                advance_token(parser);
+            }
+        }
+    }
+
+    return curve, true;
+}
+
+parse_automation_value :: (parser: *Parser, target_type: Automation_Target_Type) -> float, bool {
+    token := current_token(parser);
+
+    if token.type == .MINUS {
+        next_token := peek_token(parser, 1);
+        if next_token.type == .IDENTIFIER && (next_token.text == "inf" || next_token.text == "infinity") {
+            advance_token(parser);
+            advance_token(parser);
+            return 0.0, true;
+        }
+    }
+
+    if token.type == .IDENTIFIER {
+        if token.text == "inf" || token.text == "infinity" {
+            advance_token(parser);
+            return 0.0, true;
+        }
+
+        if token.text == "center" {
+            advance_token(parser);
+            return 0.0, true;
+        }
+
+        if token.text == "left" {
+            advance_token(parser);
+            return -1.0, true;
+        }
+
+        if token.text == "right" {
+            advance_token(parser);
+            return 1.0, true;
+        }
+    }
+
+    number_value, number_success := parse_number(parser);
+    if !number_success {
+        return 0.0, false;
+    }
+
+    unit_token := current_token(parser);
+    if unit_token.type == .PERCENT {
+        advance_token(parser);
+        percent_value := cast(float) (number_value / 100.0);
+        return percent_value, true;
+    }
+
+    if unit_token.type == .IDENTIFIER {
+        unit_text := unit_token.text;
+        if unit_text == "db" || unit_text == "dB" || unit_text == "decibel" || unit_text == "decibels" {
+            advance_token(parser);
+            if target_type == .TRACK_GAIN || target_type == .MASTER_GAIN || target_type == .TRACK_SEND {
+                return decibels_to_linear(cast(float) number_value), true;
+            }
+            return cast(float) number_value, true;
+        }
+
+        if unit_text == "khz" || unit_text == "kHz" || unit_text == "Khz" || unit_text == "kHZ" {
+            advance_token(parser);
+            return cast(float) (number_value * 1000.0), true;
+        }
+
+        if unit_text == "hz" || unit_text == "Hz" || unit_text == "HZ" {
+            advance_token(parser);
+            return cast(float) number_value, true;
+        }
+
+        if unit_text == "bpm" || unit_text == "BPM" {
+            advance_token(parser);
+            return cast(float) number_value, true;
+        }
+
+        if unit_text == "l" || unit_text == "L" {
+            advance_token(parser);
+            pan_magnitude := cast(float) number_value;
+            if pan_magnitude > 1.0 {
+                pan_magnitude /= 100.0;
+            }
+            return -pan_magnitude, true;
+        }
+
+        if unit_text == "r" || unit_text == "R" {
+            advance_token(parser);
+            pan_magnitude := cast(float) number_value;
+            if pan_magnitude > 1.0 {
+                pan_magnitude /= 100.0;
+            }
+            return pan_magnitude, true;
+        }
+
+        if unit_text == "c" || unit_text == "C" {
+            advance_token(parser);
+            return 0.0, true;
+        }
+    }
+
+    return cast(float) number_value, true;
 }
 
 validate_song_specification :: (parser: *Parser, song_specification: *Song_Specification) -> bool {
@@ -2865,6 +3266,93 @@ validate_song_specification :: (parser: *Parser, song_specification: *Song_Speci
         }
 
         aux_track_index += 1;
+    }
+
+    automation_index := 0;
+    while automation_index < song_specification.automation.curves.count {
+        curve := *song_specification.automation.curves[automation_index];
+
+        if curve.target_type == .TRACK_GAIN || curve.target_type == .TRACK_PAN || curve.target_type == .TRACK_FILTER_CUTOFF || curve.target_type == .TRACK_FILTER_RESONANCE || curve.target_type == .TRACK_SEND {
+            if curve.track_name.count > 0 && curve.track_index == 0 {
+                resolved := false;
+                mixer_search_index := 0;
+                while mixer_search_index < song_specification.mixer.tracks.count {
+                    track := *song_specification.mixer.tracks[mixer_search_index];
+                    if track.name == curve.track_name {
+                        curve.track_index = track.track_index;
+                        resolved = true;
+                        break;
+                    }
+
+                    mixer_search_index += 1;
+                }
+
+                if !resolved {
+                    routing_search_index := 0;
+                    while routing_search_index < song_specification.routings.count {
+                        routing := *song_specification.routings[routing_search_index];
+                        if routing.instrument_name == curve.track_name {
+                            curve.track_index = routing.track_index;
+                            resolved = true;
+                            break;
+                        }
+
+                        routing_search_index += 1;
+                    }
+                }
+
+                if !resolved {
+                    set_error(parser, curve.location, sprint("Automation references undefined track '%'", curve.track_name));
+                    return false;
+                }
+            }
+
+            if curve.track_index < 1 || curve.track_index > MAXIMUM_TRACKS {
+                set_error(parser, curve.location, sprint("Invalid automation track index %", curve.track_index));
+                return false;
+            }
+
+            if curve.target_type == .TRACK_SEND {
+                if curve.aux_send_index < 1 || curve.aux_send_index > MAXIMUM_AUX_TRACKS {
+                    set_error(parser, curve.location, sprint("Invalid automation aux send index %", curve.aux_send_index));
+                    return false;
+                }
+            }
+
+            if curve.target_type == .TRACK_FILTER_CUTOFF || curve.target_type == .TRACK_FILTER_RESONANCE {
+                found := false;
+                mixer_search_index := 0;
+                while mixer_search_index < song_specification.mixer.tracks.count {
+                    track := *song_specification.mixer.tracks[mixer_search_index];
+                    if track.track_index == curve.track_index {
+                        track.filter_enabled = true;
+                        found = true;
+                        break;
+                    }
+
+                    mixer_search_index += 1;
+                }
+
+                if !found {
+                    new_track: Mixer_Track_Definition;
+                    new_track.track_index = curve.track_index;
+                    new_track.filter_enabled = true;
+                    array_add(*song_specification.mixer.tracks, new_track);
+                }
+            }
+        }
+
+        if curve.start_bar < 1 {
+            set_error(parser, curve.location, sprint("Automation start bar must be at least 1, got %", curve.start_bar));
+            return false;
+        }
+
+        if curve.end_bar < curve.start_bar {
+            set_error(parser, curve.location, sprint("Automation end bar (%) cannot be before start bar (%)", curve.end_bar, curve.start_bar));
+            return false;
+        }
+
+        automation_index += 1;
     }
 
     return true;

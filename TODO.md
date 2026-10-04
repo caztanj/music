@@ -123,8 +123,8 @@
 
 > **Goal**: Give songs evolving energy, tension, and release through automated sweeps, risers, and fades.
 
-- [ ] **15.1 Automation Model & Syntax (`src/parser/`)**
-  - [ ] Extend `.song` language with an `[automation]` section or inline arrangement curves:
+- [x] **15.1 Automation Model & Syntax (`src/parser/`)**
+  - [x] Extend `.song` language with an `[automation]` section or inline arrangement curves:
     - `automate track 1.filter_cutoff from 200 to 8000 over bar 9-16 curve=exponential`
     - `automate track 2.gain from -inf to 0dB over bar 1-4 curve=linear`
     - `automate tempo from 120 to 140 over bar 16-17`
