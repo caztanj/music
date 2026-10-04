@@ -204,4 +204,190 @@ mixer_tests :: () {
         expect_true(mixer.aux_tracks[1].delay_enabled);
         expect_near(mixer.aux_tracks[1].stereo_delay.feedback, 0.4, 0.001);
     });
+
+    test("mixer_loudness_meter_1khz_sine_standard_lufs", () {
+        meter: Loudness_Meter;
+        initialize_loudness_meter(*meter, 48000);
+        defer deinitialize_loudness_meter(*meter);
+
+        frame_count: s64 = 48000;
+        left_channel := NewArray(frame_count, float);
+        defer free(left_channel.data);
+        right_channel := NewArray(frame_count, float);
+        defer free(right_channel.data);
+
+        sample_index: s64 = 0;
+        while sample_index < frame_count {
+            time_seconds := cast(float64) sample_index / 48000.0;
+            sine_value := cast(float) sin(2.0 * PI * 1000.0 * time_seconds);
+            left_channel[sample_index] = sine_value;
+            right_channel[sample_index] = sine_value;
+            sample_index += 1;
+        }
+
+        block_size: s64 = 512;
+        rendered_frames: s64 = 0;
+        while rendered_frames < frame_count {
+            frames_to_process := frame_count - rendered_frames;
+            if frames_to_process > block_size {
+                frames_to_process = block_size;
+            }
+
+            temporary_left: [] float;
+            temporary_left.data = left_channel.data + rendered_frames;
+            temporary_left.count = frames_to_process;
+
+            temporary_right: [] float;
+            temporary_right.data = right_channel.data + rendered_frames;
+            temporary_right.count = frames_to_process;
+
+            process_loudness_meter_block(*meter, temporary_left, temporary_right, frames_to_process);
+            rendered_frames += frames_to_process;
+        }
+
+        momentary := get_momentary_loudness_lufs(*meter);
+        short_term := get_short_term_loudness_lufs(*meter);
+        integrated := get_integrated_loudness_lufs(*meter);
+
+        expect_near(momentary, 0.0, 0.1);
+        expect_near(short_term, 0.0, 0.1);
+        expect_near(integrated, 0.0, 0.1);
+    });
+
+    test("mixer_loudness_meter_gating_silence_rejection", () {
+        meter: Loudness_Meter;
+        initialize_loudness_meter(*meter, 44100);
+        defer deinitialize_loudness_meter(*meter);
+
+        active_seconds: s64 = 1;
+        silence_seconds: s64 = 3;
+        total_seconds := active_seconds + silence_seconds;
+        total_frames := total_seconds * 44100;
+
+        left_channel := NewArray(total_frames, float);
+        defer free(left_channel.data);
+        right_channel := NewArray(total_frames, float);
+        defer free(right_channel.data);
+
+        active_frames := active_seconds * 44100;
+        amplitude := cast(float) pow(10.0, -10.0 / 20.0);
+
+        sample_index: s64 = 0;
+        while sample_index < active_frames {
+            time_seconds := cast(float64) sample_index / 44100.0;
+            sine_value := amplitude * cast(float) sin(2.0 * PI * 1000.0 * time_seconds);
+            left_channel[sample_index] = sine_value;
+            right_channel[sample_index] = sine_value;
+            sample_index += 1;
+        }
+
+        while sample_index < total_frames {
+            left_channel[sample_index] = 0.0;
+            right_channel[sample_index] = 0.0;
+            sample_index += 1;
+        }
+
+        block_size: s64 = 512;
+        rendered_frames: s64 = 0;
+        while rendered_frames < total_frames {
+            frames_to_process := total_frames - rendered_frames;
+            if frames_to_process > block_size {
+                frames_to_process = block_size;
+            }
+
+            temporary_left: [] float;
+            temporary_left.data = left_channel.data + rendered_frames;
+            temporary_left.count = frames_to_process;
+
+            temporary_right: [] float;
+            temporary_right.data = right_channel.data + rendered_frames;
+            temporary_right.count = frames_to_process;
+
+            process_loudness_meter_block(*meter, temporary_left, temporary_right, frames_to_process);
+            rendered_frames += frames_to_process;
+        }
+
+        integrated := get_integrated_loudness_lufs(*meter);
+        expect_near(integrated, -10.7, 0.2);
+        expect_true(integrated > -15.0);
+    });
+
+    test("mixer_true_peak_detector_oversampling_inter_sample_peaks", () {
+        detector: True_Peak_Detector;
+        initialize_true_peak_detector(*detector);
+
+        frame_count: s64 = 256;
+        left_channel := NewArray(frame_count, float);
+        defer free(left_channel.data);
+        right_channel := NewArray(frame_count, float);
+        defer free(right_channel.data);
+
+        sample_maximum: float = 0.0;
+        sample_index: s64 = 0;
+        while sample_index < frame_count {
+            sample_angle := cast(float) sample_index * (PI * 0.5) + (PI * 0.25);
+            sine_value := cast(float) sin(sample_angle);
+            left_channel[sample_index] = sine_value;
+            right_channel[sample_index] = sine_value;
+
+            if abs(sine_value) > sample_maximum {
+                sample_maximum = abs(sine_value);
+            }
+
+            sample_index += 1;
+        }
+
+        expect_near(sample_maximum, cast(float) (sqrt(2.0) * 0.5), 0.001);
+
+        meter: Loudness_Meter;
+        initialize_loudness_meter(*meter, 48000);
+        defer deinitialize_loudness_meter(*meter);
+
+        process_loudness_meter_block(*meter, left_channel, right_channel, frame_count);
+
+        linear_true_peak := get_true_peak_linear(*meter);
+        decibels_true_peak := get_maximum_true_peak_decibels(*meter);
+
+        expect_true(linear_true_peak > 0.98);
+        expect_near(decibels_true_peak, 0.0, 0.1);
+    });
+
+    test("mixer_loudness_meter_live_terminal_formatting", () {
+        meter: Loudness_Meter;
+        initialize_loudness_meter(*meter, 48000);
+        defer deinitialize_loudness_meter(*meter);
+
+        formatted_status := format_loudness_meter_status(*meter);
+        defer free(formatted_status);
+
+        expect_equals(formatted_status, "Loudness: -70.0 LUFS | True Peak: -100.0 dBFS");
+    });
+
+    test("mixer_mix_channels_to_master_updates_metering_automatically", () {
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+        initialize_mixer(mixer, 48000);
+
+        channel, channel_found := find_mixer_channel(mixer, 1);
+        expect_true(channel_found);
+
+        clear_channel_buffers(mixer, 512);
+        frame_index := 0;
+        while frame_index < 512 {
+            channel.left_buffer[frame_index] = 0.5;
+            channel.right_buffer[frame_index] = 0.5;
+            frame_index += 1;
+        }
+
+        mix_channels_to_master(mixer, 512);
+
+        linear_peak := get_true_peak_linear(*mixer.loudness_meter);
+        momentary_lufs := get_momentary_loudness_lufs(*mixer.loudness_meter);
+
+        expect_true(linear_peak > 0.0);
+        expect_true(momentary_lufs > -70.0);
+    });
 }

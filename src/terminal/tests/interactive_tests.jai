@@ -100,4 +100,15 @@ interactive_tests :: () {
 
         expect_equals(paused_status_line, "[PAUSED]  Bar: 04.2 | BPM: 128 | CPU: 1.2% | Voices: 0/128");
     });
+
+    test("format_loudness_meter_status_display", () {
+        player: Playback_State;
+        initialize_mixer(*player.mixer, 44100);
+        defer deinitialize_mixer(*player.mixer);
+
+        loudness_line := format_loudness_meter_status(*player.mixer.loudness_meter);
+        defer free(loudness_line);
+
+        expect_equals(loudness_line, "Loudness: -70.0 LUFS | True Peak: -100.0 dBFS");
+    });
 }

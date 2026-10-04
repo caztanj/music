@@ -302,6 +302,7 @@ shutdown_playback_state :: (player: *Playback_State) {
 
     audio_backend_shutdown(*player.audio_backend);
     hot_reloader_shutdown(*player.hot_reloader);
+    deinitialize_mixer(*player.mixer);
 }
 
 run_interactive_playback :: (song_path: string) -> bool {
@@ -343,11 +344,13 @@ run_interactive_playback :: (song_path: string) -> bool {
         }
 
         status_line := format_playback_status_line(*player);
+        loudness_line := format_loudness_meter_status(*player.mixer.loudness_meter);
         vu_meters := format_vu_meters_display(player.peak_level_left, player.peak_level_right);
 
-        print("\r% | %   ", status_line, vu_meters);
+        print("\r% | % | %   ", status_line, loudness_line, vu_meters);
 
         free(status_line);
+        free(loudness_line);
         free(vu_meters);
 
         sleep_milliseconds(25);

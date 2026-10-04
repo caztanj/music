@@ -142,10 +142,10 @@
 
 > **Goal**: Deliver broadcast-ready audio masters and individual stems for archival, collaboration, or external mixing.
 
-- [ ] **16.1 Industry Standard Loudness & Metering (`src/engine/mixer.jai`)**
-  - [ ] Integrated, Short-term, and Momentary LUFS loudness calculation conforming to ITU-R BS.1770 / EBU R128.
-  - [ ] True-Peak detector (oversampled 4x) to avoid inter-sample clipping on digital playback systems.
-  - [ ] Live terminal status displaying current LUFS (e.g. `Loudness: -14.2 LUFS | True Peak: -0.3 dBFS`).
+- [x] **16.1 Industry Standard Loudness & Metering (`src/engine/mixer.jai`)**
+  - [x] Integrated, Short-term, and Momentary LUFS loudness calculation conforming to ITU-R BS.1770 / EBU R128.
+  - [x] True-Peak detector (oversampled 4x) to avoid inter-sample clipping on digital playback systems.
+  - [x] Live terminal status displaying current LUFS (e.g. `Loudness: -14.2 LUFS | True Peak: -0.3 dBFS`).
 - [ ] **16.2 Multi-Track Stem Export**
   - [ ] CLI command: `music_engine export <file.song> --stems -o <output_directory>/`.
   - [ ] Render all mixer channels (Drums, Bass, Synths, FX, Master) into separate, synchronized WAV stems in a single pass.
