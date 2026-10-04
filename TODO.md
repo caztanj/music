@@ -159,8 +159,8 @@
 
 > **Goal**: Prove that the engine can produce complete, commercial-grade, multi-minute compositions with intro, builds, drops, breakdowns, and outros.
 
-- [ ] **17.1 Synthwave / Cyberpunk Track (`songs/cyber_city.song`)**
-  - [ ] 3+ minute complete track featuring driving sidechained bassline, unison supersaw leads, gated reverb snare, and automated filter sweeps.
+- [x] **17.1 Synthwave / Cyberpunk Track (`songs/cyber_city.song`)**
+  - [x] 3+ minute complete track featuring driving sidechained bassline, unison supersaw leads, gated reverb snare, and automated filter sweeps.
 - [ ] **17.2 Lo-Fi Chillhop Beat (`songs/midnight_coffee.song`)**
   - [ ] Swing groove, saturated acoustic drums, Rhodes-style warm chords, vinyl noise layer, and relaxed tempo.
 - [ ] **17.3 Modern Electronic Club Track (`songs/pulse_reactor.song`)**

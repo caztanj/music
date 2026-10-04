@@ -214,16 +214,37 @@ wasapi_audio_thread_procedure :: (thread: *Thread) -> s64 {
             break;
         }
 
+        padding_frame_count: u32 = 0;
+        get_padding_result := state.audio_client.vtable.GetCurrentPadding(state.audio_client, *padding_frame_count);
+        if get_padding_result != 0 || padding_frame_count >= state.buffer_frame_count {
+            continue;
+        }
+
+        frames_available := state.buffer_frame_count - padding_frame_count;
+        if frames_available == 0 {
+            continue;
+        }
+
         buffer_pointer: *u8 = null;
-        get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, state.period_frame_count, *buffer_pointer);
+        get_buffer_result := state.audio_render_client.vtable.GetBuffer(state.audio_render_client, frames_available, *buffer_pointer);
         if get_buffer_result == 0 && buffer_pointer != null {
-            output_samples: [] float;
-            output_samples.data = cast(*float) buffer_pointer;
-            output_samples.count = state.period_frame_count * cast(u32) state.channel_count;
+            frames_remaining := frames_available;
+            frame_offset: u32 = 0;
 
-            state.callback(output_samples, state.channel_count, state.sample_rate, state.user_data);
+            while frames_remaining > 0 {
+                chunk_frame_count := ifx frames_remaining > MAXIMUM_BLOCK_SIZE then cast(u32) MAXIMUM_BLOCK_SIZE else frames_remaining;
 
-            state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, state.period_frame_count, 0);
+                output_samples: [] float;
+                output_samples.data = (cast(*float) buffer_pointer) + (frame_offset * cast(u32) state.channel_count);
+                output_samples.count = chunk_frame_count * cast(u32) state.channel_count;
+
+                state.callback(output_samples, state.channel_count, state.sample_rate, state.user_data);
+
+                frames_remaining -= chunk_frame_count;
+                frame_offset += chunk_frame_count;
+            }
+
+            state.audio_render_client.vtable.ReleaseBuffer(state.audio_render_client, frames_available, 0);
         }
     }
 

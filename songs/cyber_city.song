@@ -1,0 +1,554 @@
+[project]
+name = "Cyber City"
+bpm = 120
+time_signature = 4/4
+bars = 96
+swing = 0.05
+
+[instruments]
+kick = sampler("samples/kick.wav", gain = 1.0)
+snare = sampler("samples/snare.wav", gain = 0.85)
+hihat = sampler("samples/hihat.wav", gain = 0.70)
+clap = sampler("samples/clap.wav", gain = 0.75)
+bass = synth(wave="saw", wave2="square", coarse2=-12, osc_mix=0.6, filter="lowpass", cutoff=650, res=0.25, attack=3, decay=120, sustain=0.4, release=80, gain=0.90)
+lead = synth(wave="saw", unison=6, detune=22.0, spread=0.85, filter="lowpass", cutoff=2800, res=0.25, attack=12, decay=180, sustain=0.7, release=220, gain=0.65)
+arp = synth(wave="saw", filter="lowpass", cutoff=1400, res=0.35, attack=5, decay=90, sustain=0.3, release=100, gain=0.75)
+pad = synth(wave="saw", wave2="saw", tune2=8.0, osc_mix=0.5, filter="lowpass", cutoff=1100, res=0.15, attack=180, decay=350, sustain=0.8, release=450, gain=0.70)
+
+[pattern drum_intro]
+kick  | x . . . . . . . x . . . . . . . |
+hihat | . . x . . . x . . . x . . . x . |
+
+[pattern drum_verse]
+kick  | x . . . x . . . x . . . x . . . |
+snare | . . . . x . . . . . . . x . . . |
+hihat | x . x . x . x . x . x . x . x . |
+
+[pattern drum_chorus]
+kick  | x . . . x . . . x . . . x . . . |
+snare | . . . . x . . . . . . . x . . . |
+clap  | . . . . x . . . . . . . x . . . |
+hihat | x x x x x x x x x x x x x x x x |
+
+[pattern drum_build]
+snare | x . x . x . x . x x x x x x x x |
+clap  | . . . . . . . . . . x . . . x . |
+hihat | x . x . x . x . x . x . x . x . |
+
+[pattern drum_outro]
+kick  | x . . . . . . . x . . . . . . . |
+hihat | x . . . x . . . x . . . x . . . |
+
+[pattern bass_intro]
+C2 step=0 len=8 vel=0.8
+C2 step=8 len=8 vel=0.75
+
+[pattern bass_drive_cm]
+C1 step=0 len=1 vel=0.95
+C1 step=1 len=1 vel=0.75
+C2 step=2 len=1 vel=0.85
+C1 step=3 len=1 vel=0.75
+C1 step=4 len=1 vel=0.90
+C1 step=5 len=1 vel=0.75
+Eb2 step=6 len=1 vel=0.85
+C1 step=7 len=1 vel=0.75
+C1 step=8 len=1 vel=0.95
+C1 step=9 len=1 vel=0.75
+C2 step=10 len=1 vel=0.85
+C1 step=11 len=1 vel=0.75
+G1 step=12 len=1 vel=0.90
+Bb1 step=13 len=1 vel=0.80
+C2 step=14 len=1 vel=0.85
+C1 step=15 len=1 vel=0.75
+
+[pattern bass_drive_ab]
+Ab0 step=0 len=1 vel=0.95
+Ab0 step=1 len=1 vel=0.75
+Ab1 step=2 len=1 vel=0.85
+Ab0 step=3 len=1 vel=0.75
+Ab0 step=4 len=1 vel=0.90
+Ab0 step=5 len=1 vel=0.75
+C2 step=6 len=1 vel=0.85
+Ab0 step=7 len=1 vel=0.75
+Ab0 step=8 len=1 vel=0.95
+Ab0 step=9 len=1 vel=0.75
+Ab1 step=10 len=1 vel=0.85
+Ab0 step=11 len=1 vel=0.75
+Eb1 step=12 len=1 vel=0.90
+G1 step=13 len=1 vel=0.80
+Ab1 step=14 len=1 vel=0.85
+Ab0 step=15 len=1 vel=0.75
+
+[pattern bass_drive_eb]
+Eb1 step=0 len=1 vel=0.95
+Eb1 step=1 len=1 vel=0.75
+Eb2 step=2 len=1 vel=0.85
+Eb1 step=3 len=1 vel=0.75
+Eb1 step=4 len=1 vel=0.90
+Eb1 step=5 len=1 vel=0.75
+G2 step=6 len=1 vel=0.85
+Eb1 step=7 len=1 vel=0.75
+Eb1 step=8 len=1 vel=0.95
+Eb1 step=9 len=1 vel=0.75
+Eb2 step=10 len=1 vel=0.85
+Eb1 step=11 len=1 vel=0.75
+Bb1 step=12 len=1 vel=0.90
+D2 step=13 len=1 vel=0.80
+Eb2 step=14 len=1 vel=0.85
+Eb1 step=15 len=1 vel=0.75
+
+[pattern bass_drive_bb]
+Bb0 step=0 len=1 vel=0.95
+Bb0 step=1 len=1 vel=0.75
+Bb1 step=2 len=1 vel=0.85
+Bb0 step=3 len=1 vel=0.75
+Bb0 step=4 len=1 vel=0.90
+Bb0 step=5 len=1 vel=0.75
+D2 step=6 len=1 vel=0.85
+Bb0 step=7 len=1 vel=0.75
+Bb0 step=8 len=1 vel=0.95
+Bb0 step=9 len=1 vel=0.75
+Bb1 step=10 len=1 vel=0.85
+Bb0 step=11 len=1 vel=0.75
+F1 step=12 len=1 vel=0.90
+A1 step=13 len=1 vel=0.80
+Bb1 step=14 len=1 vel=0.85
+Bb0 step=15 len=1 vel=0.75
+
+[pattern pad_chords_cm]
+C3 step=0 len=16 vel=0.75
+Eb3 step=0 len=16 vel=0.75
+G3 step=0 len=16 vel=0.75
+C4 step=0 len=16 vel=0.70
+
+[pattern pad_chords_ab]
+Ab2 step=0 len=16 vel=0.75
+C3 step=0 len=16 vel=0.75
+Eb3 step=0 len=16 vel=0.75
+Ab3 step=0 len=16 vel=0.70
+
+[pattern pad_chords_eb]
+Eb3 step=0 len=16 vel=0.75
+G3 step=0 len=16 vel=0.75
+Bb3 step=0 len=16 vel=0.75
+Eb4 step=0 len=16 vel=0.70
+
+[pattern pad_chords_bb]
+Bb2 step=0 len=16 vel=0.75
+D3 step=0 len=16 vel=0.75
+F3 step=0 len=16 vel=0.75
+Bb3 step=0 len=16 vel=0.70
+
+[pattern arp_cm]
+C3 step=0 len=1 vel=0.85
+Eb3 step=2 len=1 vel=0.80
+G3 step=4 len=1 vel=0.85
+C4 step=6 len=1 vel=0.90
+G3 step=8 len=1 vel=0.80
+Eb3 step=10 len=1 vel=0.85
+C3 step=12 len=1 vel=0.80
+Eb3 step=14 len=1 vel=0.85
+
+[pattern arp_ab]
+Ab2 step=0 len=1 vel=0.85
+C3 step=2 len=1 vel=0.80
+Eb3 step=4 len=1 vel=0.85
+Ab3 step=6 len=1 vel=0.90
+Eb3 step=8 len=1 vel=0.80
+C3 step=10 len=1 vel=0.85
+Ab2 step=12 len=1 vel=0.80
+C3 step=14 len=1 vel=0.85
+
+[pattern arp_eb]
+Eb3 step=0 len=1 vel=0.85
+G3 step=2 len=1 vel=0.80
+Bb3 step=4 len=1 vel=0.85
+Eb4 step=6 len=1 vel=0.90
+Bb3 step=8 len=1 vel=0.80
+G3 step=10 len=1 vel=0.85
+Eb3 step=12 len=1 vel=0.80
+G3 step=14 len=1 vel=0.85
+
+[pattern arp_bb]
+Bb2 step=0 len=1 vel=0.85
+D3 step=2 len=1 vel=0.80
+F3 step=4 len=1 vel=0.85
+Bb3 step=6 len=1 vel=0.90
+F3 step=8 len=1 vel=0.80
+D3 step=10 len=1 vel=0.85
+Bb2 step=12 len=1 vel=0.80
+D3 step=14 len=1 vel=0.85
+
+[pattern lead_hook_1]
+C4 step=0 len=3 vel=0.90
+G4 step=4 len=3 vel=0.85
+Bb4 step=8 len=4 vel=0.95
+G4 step=12 len=4 vel=0.85
+
+[pattern lead_hook_2]
+Ab4 step=0 len=4 vel=0.90
+G4 step=4 len=2 vel=0.85
+F4 step=6 len=2 vel=0.85
+Eb4 step=8 len=4 vel=0.90
+D4 step=12 len=4 vel=0.80
+
+[pattern lead_hook_3]
+Eb4 step=0 len=3 vel=0.85
+G4 step=4 len=3 vel=0.85
+Bb4 step=8 len=4 vel=0.95
+C5 step=12 len=4 vel=1.00
+
+[pattern lead_hook_4]
+D5 step=0 len=4 vel=0.95
+C5 step=4 len=2 vel=0.90
+Bb4 step=6 len=2 vel=0.85
+G4 step=8 len=4 vel=0.90
+F4 step=12 len=4 vel=0.85
+
+[pattern lead_harmony_1]
+Eb4 step=0 len=3 vel=0.80
+Bb4 step=4 len=3 vel=0.80
+D5 step=8 len=4 vel=0.85
+Bb4 step=12 len=4 vel=0.80
+
+[pattern lead_harmony_2]
+C5 step=0 len=4 vel=0.85
+Bb4 step=4 len=2 vel=0.80
+Ab4 step=6 len=2 vel=0.80
+G4 step=8 len=4 vel=0.85
+F4 step=12 len=4 vel=0.75
+
+[pattern lead_harmony_3]
+G4 step=0 len=3 vel=0.80
+Bb4 step=4 len=3 vel=0.80
+Eb5 step=8 len=4 vel=0.90
+Eb5 step=12 len=4 vel=0.90
+
+[pattern lead_harmony_4]
+F5 step=0 len=4 vel=0.90
+Eb5 step=4 len=2 vel=0.85
+D5 step=6 len=2 vel=0.80
+Bb4 step=8 len=4 vel=0.85
+Ab4 step=12 len=4 vel=0.80
+
+[mixer]
+track 1 (drums): gain = 0.95, pan = 0.0, output = master, send1 = 0.35
+track 2 (bass): gain = 0.90, pan = 0.0, filter = "lowpass", cutoff = 800, res = 0.2, sidechain = track 1, ducking_depth = 12, comp_attack = 2, comp_release = 120, output = master
+track 3 (lead): gain = 0.75, pan = 0.0, filter = "lowpass", cutoff = 8000, res = 0.25, delay = 0.25, feedback = 0.35, send1 = 0.35, output = master
+track 4 (arp): gain = 0.75, pan = -0.15, filter = "lowpass", cutoff = 3000, res = 0.3, delay = 0.375, feedback = 0.3, chorus = 0.35, chorus_rate = 1.0, send1 = 0.25, output = master
+track 5 (pad): gain = 0.70, pan = 0.15, filter = "lowpass", cutoff = 2500, res = 0.15, chorus = 0.4, chorus_rate = 0.8, send1 = 0.50, output = master
+aux 1 (reverb): gain = 0.85, reverb = 0.85, reverb_room = 0.8, reverb_damp = 0.3, reverb_predelay = 20.0
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+snare -> track 1
+hihat -> track 1
+clap -> track 1
+bass -> track 2
+lead -> track 3
+arp -> track 4
+pad -> track 5
+
+[arrangement]
+bar 1: pad_chords_cm
+bar 2: pad_chords_ab
+bar 3: pad_chords_eb
+bar 4: pad_chords_bb
+bar 5: pad_chords_cm
+bar 6: pad_chords_ab
+bar 7: pad_chords_eb
+bar 8: pad_chords_bb
+bar 1: arp_cm
+bar 2: arp_ab
+bar 3: arp_eb
+bar 4: arp_bb
+bar 5: arp_cm
+bar 6: arp_ab
+bar 7: arp_eb
+bar 8: arp_bb
+bar 9-16: drum_intro
+bar 9-16: bass_intro
+bar 9: arp_cm
+bar 10: arp_ab
+bar 11: arp_eb
+bar 12: arp_bb
+bar 13: arp_cm
+bar 14: arp_ab
+bar 15: arp_eb
+bar 16: arp_bb
+bar 9: pad_chords_cm
+bar 10: pad_chords_ab
+bar 11: pad_chords_eb
+bar 12: pad_chords_bb
+bar 13: pad_chords_cm
+bar 14: pad_chords_ab
+bar 15: pad_chords_eb
+bar 16: pad_chords_bb
+
+bar 17-32: drum_verse
+bar 17: bass_drive_cm
+bar 18: bass_drive_ab
+bar 19: bass_drive_eb
+bar 20: bass_drive_bb
+bar 21: bass_drive_cm
+bar 22: bass_drive_ab
+bar 23: bass_drive_eb
+bar 24: bass_drive_bb
+bar 25: bass_drive_cm
+bar 26: bass_drive_ab
+bar 27: bass_drive_eb
+bar 28: bass_drive_bb
+bar 29: bass_drive_cm
+bar 30: bass_drive_ab
+bar 31: bass_drive_eb
+bar 32: bass_drive_bb
+bar 17: arp_cm
+bar 18: arp_ab
+bar 19: arp_eb
+bar 20: arp_bb
+bar 21: arp_cm
+bar 22: arp_ab
+bar 23: arp_eb
+bar 24: arp_bb
+bar 25: arp_cm
+bar 26: arp_ab
+bar 27: arp_eb
+bar 28: arp_bb
+bar 29: arp_cm
+bar 30: arp_ab
+bar 31: arp_eb
+bar 32: arp_bb
+bar 25: pad_chords_cm
+bar 26: pad_chords_ab
+bar 27: pad_chords_eb
+bar 28: pad_chords_bb
+bar 29: pad_chords_cm
+bar 30: pad_chords_ab
+bar 31: pad_chords_eb
+bar 32: pad_chords_bb
+
+bar 33-48: drum_chorus
+bar 33: bass_drive_cm
+bar 34: bass_drive_ab
+bar 35: bass_drive_eb
+bar 36: bass_drive_bb
+bar 37: bass_drive_cm
+bar 38: bass_drive_ab
+bar 39: bass_drive_eb
+bar 40: bass_drive_bb
+bar 41: bass_drive_cm
+bar 42: bass_drive_ab
+bar 43: bass_drive_eb
+bar 44: bass_drive_bb
+bar 45: bass_drive_cm
+bar 46: bass_drive_ab
+bar 47: bass_drive_eb
+bar 48: bass_drive_bb
+bar 33: lead_hook_1
+bar 34: lead_hook_2
+bar 35: lead_hook_3
+bar 36: lead_hook_4
+bar 37: lead_hook_1
+bar 38: lead_hook_2
+bar 39: lead_hook_3
+bar 40: lead_hook_4
+bar 41: lead_hook_1
+bar 42: lead_hook_2
+bar 43: lead_hook_3
+bar 44: lead_hook_4
+bar 45: lead_hook_1
+bar 46: lead_hook_2
+bar 47: lead_hook_3
+bar 48: lead_hook_4
+bar 33: arp_cm
+bar 34: arp_ab
+bar 35: arp_eb
+bar 36: arp_bb
+bar 37: arp_cm
+bar 38: arp_ab
+bar 39: arp_eb
+bar 40: arp_bb
+bar 41: arp_cm
+bar 42: arp_ab
+bar 43: arp_eb
+bar 44: arp_bb
+bar 45: arp_cm
+bar 46: arp_ab
+bar 47: arp_eb
+bar 48: arp_bb
+bar 33: pad_chords_cm
+bar 34: pad_chords_ab
+bar 35: pad_chords_eb
+bar 36: pad_chords_bb
+bar 37: pad_chords_cm
+bar 38: pad_chords_ab
+bar 39: pad_chords_eb
+bar 40: pad_chords_bb
+bar 41: pad_chords_cm
+bar 42: pad_chords_ab
+bar 43: pad_chords_eb
+bar 44: pad_chords_bb
+bar 45: pad_chords_cm
+bar 46: pad_chords_ab
+bar 47: pad_chords_eb
+bar 48: pad_chords_bb
+
+bar 49: arp_cm
+bar 50: arp_ab
+bar 51: arp_eb
+bar 52: arp_bb
+bar 53: arp_cm
+bar 54: arp_ab
+bar 55: arp_eb
+bar 56: arp_bb
+bar 57: arp_cm
+bar 58: arp_ab
+bar 59: arp_eb
+bar 60: arp_bb
+bar 61: arp_cm
+bar 62: arp_ab
+bar 63: arp_eb
+bar 64: arp_bb
+bar 49: pad_chords_cm
+bar 50: pad_chords_ab
+bar 51: pad_chords_eb
+bar 52: pad_chords_bb
+bar 53: pad_chords_cm
+bar 54: pad_chords_ab
+bar 55: pad_chords_eb
+bar 56: pad_chords_bb
+bar 57: pad_chords_cm
+bar 58: pad_chords_ab
+bar 59: pad_chords_eb
+bar 60: pad_chords_bb
+bar 61: pad_chords_cm
+bar 62: pad_chords_ab
+bar 63: pad_chords_eb
+bar 64: pad_chords_bb
+bar 57-64: bass_intro
+
+bar 65-72: drum_build
+bar 65: arp_cm
+bar 66: arp_ab
+bar 67: arp_eb
+bar 68: arp_bb
+bar 69: arp_cm
+bar 70: arp_ab
+bar 71: arp_eb
+bar 72: arp_bb
+bar 65: pad_chords_cm
+bar 66: pad_chords_ab
+bar 67: pad_chords_eb
+bar 68: pad_chords_bb
+bar 69: pad_chords_cm
+bar 70: pad_chords_ab
+bar 71: pad_chords_eb
+bar 72: pad_chords_bb
+
+bar 73-88: drum_chorus
+bar 73: bass_drive_cm
+bar 74: bass_drive_ab
+bar 75: bass_drive_eb
+bar 76: bass_drive_bb
+bar 77: bass_drive_cm
+bar 78: bass_drive_ab
+bar 79: bass_drive_eb
+bar 80: bass_drive_bb
+bar 81: bass_drive_cm
+bar 82: bass_drive_ab
+bar 83: bass_drive_eb
+bar 84: bass_drive_bb
+bar 85: bass_drive_cm
+bar 86: bass_drive_ab
+bar 87: bass_drive_eb
+bar 88: bass_drive_bb
+bar 73: lead_hook_1
+bar 74: lead_hook_2
+bar 75: lead_hook_3
+bar 76: lead_hook_4
+bar 77: lead_hook_1
+bar 78: lead_hook_2
+bar 79: lead_hook_3
+bar 80: lead_hook_4
+bar 81: lead_hook_1
+bar 82: lead_hook_2
+bar 83: lead_hook_3
+bar 84: lead_hook_4
+bar 85: lead_hook_1
+bar 86: lead_hook_2
+bar 87: lead_hook_3
+bar 88: lead_hook_4
+bar 73: lead_harmony_1
+bar 74: lead_harmony_2
+bar 75: lead_harmony_3
+bar 76: lead_harmony_4
+bar 77: lead_harmony_1
+bar 78: lead_harmony_2
+bar 79: lead_harmony_3
+bar 80: lead_harmony_4
+bar 81: lead_harmony_1
+bar 82: lead_harmony_2
+bar 83: lead_harmony_3
+bar 84: lead_harmony_4
+bar 85: lead_harmony_1
+bar 86: lead_harmony_2
+bar 87: lead_harmony_3
+bar 88: lead_harmony_4
+bar 73: arp_cm
+bar 74: arp_ab
+bar 75: arp_eb
+bar 76: arp_bb
+bar 77: arp_cm
+bar 78: arp_ab
+bar 79: arp_eb
+bar 80: arp_bb
+bar 81: arp_cm
+bar 82: arp_ab
+bar 83: arp_eb
+bar 84: arp_bb
+bar 85: arp_cm
+bar 86: arp_ab
+bar 87: arp_eb
+bar 88: arp_bb
+bar 73: pad_chords_cm
+bar 74: pad_chords_ab
+bar 75: pad_chords_eb
+bar 76: pad_chords_bb
+bar 77: pad_chords_cm
+bar 78: pad_chords_ab
+bar 79: pad_chords_eb
+bar 80: pad_chords_bb
+bar 81: pad_chords_cm
+bar 82: pad_chords_ab
+bar 83: pad_chords_eb
+bar 84: pad_chords_bb
+bar 85: pad_chords_cm
+bar 86: pad_chords_ab
+bar 87: pad_chords_eb
+bar 88: pad_chords_bb
+
+bar 89-94: drum_outro
+bar 89-92: bass_intro
+bar 89: arp_cm
+bar 90: arp_ab
+bar 91: arp_eb
+bar 92: arp_bb
+bar 89: pad_chords_cm
+bar 90: pad_chords_ab
+bar 91: pad_chords_eb
+bar 92: pad_chords_bb
+bar 93: pad_chords_cm
+bar 94: pad_chords_ab
+bar 95: pad_chords_eb
+bar 96: pad_chords_bb
+
+[automation]
+automate track 4.filter_cutoff from 350 to 3000 over bar 1-16 curve=exponential
+automate track 2.filter_cutoff from 400 to 1800 over bar 17-24 curve=linear
+automate track 3.filter_cutoff from 2000 to 8000 over bar 33-36 curve=exponential
+automate track 2.filter_cutoff from 2000 to 350 over bar 49-56 curve=exponential
+automate track 4.filter_cutoff from 3000 to 500 over bar 49-56 curve=exponential
+automate track 4.filter_cutoff from 500 to 6000 over bar 65-72 curve=exponential
+automate track 3.filter_cutoff from 500 to 9000 over bar 65-72 curve=exponential
+automate master.gain from 0dB to -24dB over bar 93-96 curve=exponential

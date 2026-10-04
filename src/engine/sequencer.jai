@@ -411,11 +411,48 @@ collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Spec
     clip_index := 0;
     while clip_index < song_specification.arrangement.clips.count {
         clip := *song_specification.arrangement.clips[clip_index];
-        if bar_index >= clip.start_bar && bar_index <= clip.end_bar {
+        if clip.start_bar <= bar_index && clip.end_bar >= bar_index - 4 {
             pattern, pattern_found := find_pattern(song_specification, clip.pattern_name);
             if pattern_found && !is_triplet_subdivision(pattern.subdivision) {
                 pattern_swing := get_pattern_effective_swing(song_specification, pattern);
-                step_sample := calculate_step_sample_position(global_step_index, samples_per_step, pattern_swing);
+
+                if bar_index >= clip.start_bar && bar_index <= clip.end_bar {
+                    step_sample := calculate_step_sample_position(global_step_index, samples_per_step, pattern_swing);
+                    track_index := 0;
+                    while track_index < pattern.step_tracks.count {
+                        step_track := *pattern.step_tracks[track_index];
+                        routing, routing_found := find_routing_for_instrument(song_specification, step_track.instrument_name);
+                        mixer_track := ifx routing_found then routing.track_index else 1;
+                        root_note: s32 = 60;
+                        target_instrument, target_found := find_instrument(song_specification, step_track.instrument_name);
+                        if target_found && target_instrument.type == .SAMPLER {
+                            root_note = target_instrument.sampler.root_midi_note;
+                        }
+
+                        if step_track.step_events.count > 0 {
+                            event_index := 0;
+                            while event_index < step_track.step_events.count {
+                                event := *step_track.step_events[event_index];
+                                if event.step_index == step_in_bar {
+                                    event_sample := calculate_step_and_tick_sample_position(global_step_index, event.tick_offset, samples_per_step, pattern_swing);
+                                    if event_sample >= range_start_sample && event_sample < range_end_sample {
+                                        sample_offset_in_block := base_offset + cast(s64) (event_sample - range_start_sample);
+                                        add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, event.velocity, sample_offset_in_block);
+                                    }
+                                }
+                                event_index += 1;
+                            }
+                        } else if step_in_bar < step_track.steps.count && step_track.steps[step_in_bar] {
+                            if step_sample >= range_start_sample && step_sample < range_end_sample {
+                                velocity := ifx step_in_bar < step_track.velocities.count then step_track.velocities[step_in_bar] else 1.0;
+                                sample_offset_in_block := base_offset + cast(s64) (step_sample - range_start_sample);
+                                add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, velocity, sample_offset_in_block);
+                            }
+                        }
+
+                        track_index += 1;
+                    }
+                }
 
                 note_index := 0;
                 while note_index < pattern.piano_roll_notes.count {
@@ -425,11 +462,13 @@ collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Spec
                         routing, routing_found := find_routing_for_instrument(song_specification, instrument.name);
                         track_index := ifx routing_found then routing.track_index else 1;
 
-                        if note.start_step == step_in_bar {
-                            note_on_sample := calculate_step_and_tick_sample_position(global_step_index, note.tick_offset, samples_per_step, pattern_swing);
-                            if note_on_sample >= range_start_sample && note_on_sample < range_end_sample {
-                                sample_offset_in_block := base_offset + cast(s64) (note_on_sample - range_start_sample);
-                                add_sequencer_event(sequencer, .NOTE_ON, instrument.name, track_index, note.midi_note_number, note.velocity, sample_offset_in_block);
+                        if bar_index >= clip.start_bar && bar_index <= clip.end_bar {
+                            if note.start_step == step_in_bar {
+                                note_on_sample := calculate_step_and_tick_sample_position(global_step_index, note.tick_offset, samples_per_step, pattern_swing);
+                                if note_on_sample >= range_start_sample && note_on_sample < range_end_sample {
+                                    sample_offset_in_block := base_offset + cast(s64) (note_on_sample - range_start_sample);
+                                    add_sequencer_event(sequencer, .NOTE_ON, instrument.name, track_index, note.midi_note_number, note.velocity, sample_offset_in_block);
+                                }
                             }
                         }
 
@@ -439,51 +478,19 @@ collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Spec
                         end_tick := total_note_ticks % TICKS_PER_STEP;
 
                         if end_step % STEPS_PER_BAR == step_in_bar {
-                            global_end_step := (bar_index - 1) * STEPS_PER_BAR + end_step;
-                            note_off_sample := calculate_step_and_tick_sample_position(global_end_step, end_tick, samples_per_step, pattern_swing);
-                            if note_off_sample >= range_start_sample && note_off_sample < range_end_sample {
-                                sample_offset_in_block := base_offset + cast(s64) (note_off_sample - range_start_sample);
-                                add_sequencer_event(sequencer, .NOTE_OFF, instrument.name, track_index, note.midi_note_number, 0.0, sample_offset_in_block);
+                            bars_from_start := end_step / STEPS_PER_BAR;
+                            note_origin_bar := bar_index - bars_from_start;
+                            if note_origin_bar >= clip.start_bar && note_origin_bar <= clip.end_bar {
+                                note_off_sample := calculate_step_and_tick_sample_position(global_step_index, end_tick, samples_per_step, pattern_swing);
+                                if note_off_sample >= range_start_sample && note_off_sample < range_end_sample {
+                                    sample_offset_in_block := base_offset + cast(s64) (note_off_sample - range_start_sample);
+                                    add_sequencer_event(sequencer, .NOTE_OFF, instrument.name, track_index, note.midi_note_number, 0.0, sample_offset_in_block);
+                                }
                             }
                         }
                     }
 
                     note_index += 1;
-                }
-
-                track_index := 0;
-                while track_index < pattern.step_tracks.count {
-                    step_track := *pattern.step_tracks[track_index];
-                    routing, routing_found := find_routing_for_instrument(song_specification, step_track.instrument_name);
-                    mixer_track := ifx routing_found then routing.track_index else 1;
-                    root_note: s32 = 60;
-                    target_instrument, target_found := find_instrument(song_specification, step_track.instrument_name);
-                    if target_found && target_instrument.type == .SAMPLER {
-                        root_note = target_instrument.sampler.root_midi_note;
-                    }
-
-                    if step_track.step_events.count > 0 {
-                        event_index := 0;
-                        while event_index < step_track.step_events.count {
-                            event := *step_track.step_events[event_index];
-                            if event.step_index == step_in_bar {
-                                event_sample := calculate_step_and_tick_sample_position(global_step_index, event.tick_offset, samples_per_step, pattern_swing);
-                                if event_sample >= range_start_sample && event_sample < range_end_sample {
-                                    sample_offset_in_block := base_offset + cast(s64) (event_sample - range_start_sample);
-                                    add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, event.velocity, sample_offset_in_block);
-                                }
-                            }
-                            event_index += 1;
-                        }
-                    } else if step_in_bar < step_track.steps.count && step_track.steps[step_in_bar] {
-                        if step_sample >= range_start_sample && step_sample < range_end_sample {
-                            velocity := ifx step_in_bar < step_track.velocities.count then step_track.velocities[step_in_bar] else 1.0;
-                            sample_offset_in_block := base_offset + cast(s64) (step_sample - range_start_sample);
-                            add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, velocity, sample_offset_in_block);
-                        }
-                    }
-
-                    track_index += 1;
                 }
             }
         }
@@ -615,8 +622,16 @@ sort_sequencer_events :: (sequencer: *Sequencer) {
         current_event := sequencer.events[index];
         hole := index;
 
-        while hole > 0 && sequencer.events[hole - 1].sample_offset_in_block > current_event.sample_offset_in_block {
-            sequencer.events[hole] = sequencer.events[hole - 1];
+        while hole > 0 {
+            previous_event := *sequencer.events[hole - 1];
+            should_swap := (previous_event.sample_offset_in_block > current_event.sample_offset_in_block) ||
+                (previous_event.sample_offset_in_block == current_event.sample_offset_in_block && previous_event.event_type > current_event.event_type);
+
+            if !should_swap {
+                break;
+            }
+
+            sequencer.events[hole] = previous_event.*;
             hole -= 1;
         }
 
@@ -759,7 +774,9 @@ evaluate_automation_target :: (
     beats_per_minute: float = 120.0,
     time_signature_numerator: s64 = 4
 ) -> float, bool {
-    matching_curve_indices: [..] s64;
+    matching_curve_indices: [128] s64;
+    matching_curve_count: s64 = 0;
+
     curve_index := 0;
     while curve_index < song_specification.automation.curves.count {
         curve := *song_specification.automation.curves[curve_index];
@@ -767,22 +784,25 @@ evaluate_automation_target :: (
             if target_type == .TRACK_GAIN || target_type == .TRACK_PAN || target_type == .TRACK_FILTER_CUTOFF || target_type == .TRACK_FILTER_RESONANCE || target_type == .TRACK_SEND {
                 if curve.track_index == track_index {
                     if target_type == .TRACK_SEND {
-                        if curve.aux_send_index == aux_send_index {
-                            array_add(*matching_curve_indices, curve_index);
+                        if curve.aux_send_index == aux_send_index && matching_curve_count < 128 {
+                            matching_curve_indices[matching_curve_count] = curve_index;
+                            matching_curve_count += 1;
                         }
-                    } else {
-                        array_add(*matching_curve_indices, curve_index);
+                    } else if matching_curve_count < 128 {
+                        matching_curve_indices[matching_curve_count] = curve_index;
+                        matching_curve_count += 1;
                     }
                 }
-            } else {
-                array_add(*matching_curve_indices, curve_index);
+            } else if matching_curve_count < 128 {
+                matching_curve_indices[matching_curve_count] = curve_index;
+                matching_curve_count += 1;
             }
         }
 
         curve_index += 1;
     }
 
-    if matching_curve_indices.count == 0 {
+    if matching_curve_count == 0 {
         return 0.0, false;
     }
 
@@ -790,7 +810,7 @@ evaluate_automation_target :: (
     current_sample_float := cast(float64) sample_position;
 
     match_index := 0;
-    while match_index < matching_curve_indices.count {
+    while match_index < matching_curve_count {
         matched_index := matching_curve_indices[match_index];
         curve := *song_specification.automation.curves[matched_index];
         curve_start_sample := cast(float64)(curve.start_bar - 1) * samples_per_bar;
@@ -798,6 +818,7 @@ evaluate_automation_target :: (
 
         if current_sample_float >= curve_start_sample && current_sample_float <= curve_end_sample {
             interpolated_value := evaluate_automation_curve_at_sample(curve, sample_position, sample_rate, beats_per_minute, time_signature_numerator);
+
             return interpolated_value, true;
         }
 
@@ -812,7 +833,7 @@ evaluate_automation_target :: (
 
     last_ended_curve := first_curve;
     match_index = 0;
-    while match_index < matching_curve_indices.count {
+    while match_index < matching_curve_count {
         matched_index := matching_curve_indices[match_index];
         curve := *song_specification.automation.curves[matched_index];
         curve_end_sample := cast(float64) curve.end_bar * samples_per_bar;

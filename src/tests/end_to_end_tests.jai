@@ -243,4 +243,55 @@ end_to_end_tests :: () {
         hot_reloader_shutdown(*hot_reloader);
         file_delete(temporary_song_path);
     });
+
+    test("cyber_city_showcase_song_validation", () {
+        song_specification, parse_success, parse_error_message := parse_song_from_file("songs/cyber_city.song", check_samples_on_disk = true);
+        expect_true(parse_success);
+        expect_equals(song_specification.project.name, "Cyber City");
+        expect_equals(song_specification.project.beats_per_minute, 120.0);
+        expect_equals(song_specification.instruments.count, 8);
+        expect_equals(song_specification.mixer.tracks.count, 5);
+        expect_equals(song_specification.mixer.aux_tracks.count, 1);
+        expect_equals(song_specification.automation.curves.count, 8);
+
+        sample_rate: s64 = 44100;
+        sequencer: Sequencer;
+        configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+        sequencer.clock.is_looping = false;
+
+        total_clock_samples := calculate_total_clock_samples(*sequencer.clock);
+        duration_in_seconds := cast(float) total_clock_samples / cast(float) sample_rate;
+        expect_true(duration_in_seconds >= 180.0);
+
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, sample_rate);
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+        configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+        test_block_frames: s64 = 1024;
+        audio_buffer := NewArray(test_block_frames * 2, float);
+        defer free(audio_buffer.data);
+
+        render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, audio_buffer, test_block_frames);
+
+        has_numerical_error := false;
+        sample_index := 0;
+        while sample_index < audio_buffer.count {
+            sample_value := audio_buffer[sample_index];
+            is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+            if is_nan_value || is_inf_value {
+                has_numerical_error = true;
+                break;
+            }
+            sample_index += 1;
+        }
+
+        expect_true(!has_numerical_error);
+    });
 }
