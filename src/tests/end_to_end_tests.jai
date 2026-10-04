@@ -49,21 +49,31 @@ end_to_end_tests :: () {
         configure_sequencer_from_song(*offline_sequencer, *song_specification, sample_rate);
         offline_sequencer.clock.is_looping = false;
 
-        offline_voice_manager: Voice_Manager;
-        initialize_voice_manager(*offline_voice_manager, sample_rate);
+        offline_voice_manager := New(Voice_Manager);
+        defer free(offline_voice_manager);
+        initialize_voice_manager(offline_voice_manager, sample_rate);
 
-        offline_mixer: Mixer;
-        configure_mixer_from_definition(*offline_mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+        offline_mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(offline_mixer);
+            free(offline_mixer);
+        }
+        configure_mixer_from_definition(offline_mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
 
         realtime_sequencer: Sequencer;
         configure_sequencer_from_song(*realtime_sequencer, *song_specification, sample_rate);
         realtime_sequencer.clock.is_looping = false;
 
-        realtime_voice_manager: Voice_Manager;
-        initialize_voice_manager(*realtime_voice_manager, sample_rate);
+        realtime_voice_manager := New(Voice_Manager);
+        defer free(realtime_voice_manager);
+        initialize_voice_manager(realtime_voice_manager, sample_rate);
 
-        realtime_mixer: Mixer;
-        configure_mixer_from_definition(*realtime_mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+        realtime_mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(realtime_mixer);
+            free(realtime_mixer);
+        }
+        configure_mixer_from_definition(realtime_mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
 
         offline_samples := NewArray(total_frames_to_test * 2, float);
         defer free(offline_samples.data);
@@ -82,13 +92,13 @@ end_to_end_tests :: () {
             offline_slice.data = offline_samples.data + rendered_frames * 2;
             offline_slice.count = frames_to_render * 2;
 
-            render_sequencer_block(*offline_sequencer, *song_specification, *offline_voice_manager, *offline_mixer, offline_slice, frames_to_render);
+            render_sequencer_block(*offline_sequencer, *song_specification, offline_voice_manager, offline_mixer, offline_slice, frames_to_render);
 
             realtime_slice: [] float;
             realtime_slice.data = realtime_samples.data + rendered_frames * 2;
             realtime_slice.count = frames_to_render * 2;
 
-            render_sequencer_block(*realtime_sequencer, *song_specification, *realtime_voice_manager, *realtime_mixer, realtime_slice, frames_to_render);
+            render_sequencer_block(*realtime_sequencer, *song_specification, realtime_voice_manager, realtime_mixer, realtime_slice, frames_to_render);
 
             rendered_frames += frames_to_render;
         }
@@ -124,9 +134,15 @@ end_to_end_tests :: () {
         expect_true(initialize_success);
 
         sequencer: Sequencer;
-        voice_manager: Voice_Manager;
-        initialize_voice_manager(*voice_manager, DEFAULT_SAMPLE_RATE);
-        mixer: Mixer;
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, DEFAULT_SAMPLE_RATE);
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
 
         block_size_in_frames: s64 = 512;
         audio_buffer := NewArray(block_size_in_frames * 2, float);
@@ -137,8 +153,8 @@ end_to_end_tests :: () {
         render_audio_block_with_hot_reload(
             *hot_reloader,
             *sequencer,
-            *voice_manager,
-            *mixer,
+            voice_manager,
+            mixer,
             audio_buffer,
             block_size_in_frames,
             *last_applied_version
@@ -170,8 +186,8 @@ end_to_end_tests :: () {
         render_audio_block_with_hot_reload(
             *hot_reloader,
             *sequencer,
-            *voice_manager,
-            *mixer,
+            voice_manager,
+            mixer,
             audio_buffer,
             block_size_in_frames,
             *last_applied_version
@@ -202,8 +218,8 @@ end_to_end_tests :: () {
         render_audio_block_with_hot_reload(
             *hot_reloader,
             *sequencer,
-            *voice_manager,
-            *mixer,
+            voice_manager,
+            mixer,
             audio_buffer,
             block_size_in_frames,
             *last_applied_version

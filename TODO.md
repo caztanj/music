@@ -5,11 +5,10 @@
 | **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
 | **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟢 Completed |
 | **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | 🟢 Completed |
-| **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | 🟡 In Progress |
-
-| **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | ⬜ Planned |
-| **Phase 15** | Automation & Modulation Curves | Timeline Parameter Automation (Sweeps, Risers, Fades) | ⬜ Planned |
-| **Phase 16** | Mastering & Multi-Track Stems | LUFS Loudness Metering, Stem Export, TPDF Dither | ⬜ Planned |
+| **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | 🟢 Completed |
+| **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | 🟢 Completed |
+| **Phase 15** | Automation & Modulation Curves | Timeline Parameter Automation (Sweeps, Risers, Fades) | 🟢 Completed |
+| **Phase 16** | Mastering & Multi-Track Stems | LUFS Loudness Metering, Stem Export, TPDF Dither | 🟡 In Progress |
 | **Phase 17** | Professional Production Showcase | Full-length Multi-minute Songs (Synthwave, Lo-Fi, Club) | ⬜ Planned |
 
 ---
@@ -146,9 +145,9 @@
   - [x] Integrated, Short-term, and Momentary LUFS loudness calculation conforming to ITU-R BS.1770 / EBU R128.
   - [x] True-Peak detector (oversampled 4x) to avoid inter-sample clipping on digital playback systems.
   - [x] Live terminal status displaying current LUFS (e.g. `Loudness: -14.2 LUFS | True Peak: -0.3 dBFS`).
-- [ ] **16.2 Multi-Track Stem Export**
-  - [ ] CLI command: `music_engine export <file.song> --stems -o <output_directory>/`.
-  - [ ] Render all mixer channels (Drums, Bass, Synths, FX, Master) into separate, synchronized WAV stems in a single pass.
+- [x] **16.2 Multi-Track Stem Export**
+  - [x] CLI command: `music_engine export <file.song> --stems -o <output_directory>/`.
+  - [x] Render all mixer channels (Drums, Bass, Synths, FX, Master) into separate, synchronized WAV stems in a single pass.
 - [ ] **16.3 TPDF Audio Dithering**
   - [ ] Triangular Probability Density Function (TPDF) noise dithering when exporting to 16-bit WAV to eliminate quantization distortion in quiet tails.
 

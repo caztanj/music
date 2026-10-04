@@ -27,13 +27,23 @@ main :: () {
             print("Song '%': Validation successful!\n", song_specification.project.name);
 
         case .EXPORT;
-            print("Exporting % to %\n", options.song_path, options.output_path);
-            export_success := export_song_to_wav(options.song_path, options.output_path);
-            if !export_success {
-                print("Export failed!\n");
-                exit(1);
+            if options.export_stems {
+                print("Exporting stems for % to %\n", options.song_path, options.output_path);
+                export_success := export_song_stems_to_wav(options.song_path, options.output_path);
+                if !export_success {
+                    print("Stem export failed!\n");
+                    exit(1);
+                }
+                print("Stem export completed successfully: %\n", options.output_path);
+            } else {
+                print("Exporting % to %\n", options.song_path, options.output_path);
+                export_success := export_song_to_wav(options.song_path, options.output_path);
+                if !export_success {
+                    print("Export failed!\n");
+                    exit(1);
+                }
+                print("Export completed successfully: %\n", options.output_path);
             }
-            print("Export completed successfully: %\n", options.output_path);
 
         case .TEST_TONE;
             print("Playing 440 Hz test tone for % seconds...\n", options.test_tone_duration);
@@ -94,14 +104,23 @@ parse_arguments :: (arguments: [] string) -> (Command_Line_Options, bool) {
         options.command = .EXPORT;
         options.song_path = arguments[2];
 
+        has_custom_output := false;
         argument_index := 3;
         while argument_index < arguments.count {
             if arguments[argument_index] == "-o" && argument_index + 1 < arguments.count {
                 options.output_path = arguments[argument_index + 1];
+                has_custom_output = true;
                 argument_index += 2;
+            } else if arguments[argument_index] == "--stems" || arguments[argument_index] == "-stems" {
+                options.export_stems = true;
+                argument_index += 1;
             } else {
                 argument_index += 1;
             }
+        }
+
+        if options.export_stems && !has_custom_output {
+            options.output_path = "stems";
         }
 
         return options, true;
@@ -127,11 +146,11 @@ parse_arguments :: (arguments: [] string) -> (Command_Line_Options, bool) {
 print_usage :: () {
     print("Usage: music_engine <command> [options]\n\n");
     print("Commands:\n");
-    print("  play <file.song>                 Play a song file with hot reloading\n");
-    print("  export <file.song> -o <out.wav>  Export a song file to WAV\n");
-    print("  check <file.song>                Validate a song file syntax\n");
-    print("  test-tone [seconds]              Play a 440 Hz sine test tone through speakers\n");
-    print("  help                             Show this help message\n");
+    print("  play <file.song>                                Play a song file with hot reloading\n");
+    print("  export <file.song> [-o <out.wav>] [--stems]     Export a song file to WAV or multi-track stems\n");
+    print("  check <file.song>                               Validate a song file syntax\n");
+    print("  test-tone [seconds]                             Play a 440 Hz sine test tone through speakers\n");
+    print("  help                                            Show this help message\n");
 }
 
 Command_Type :: enum {
@@ -147,6 +166,7 @@ Command_Line_Options :: struct {
     command: Command_Type = .NONE;
     song_path: string;
     output_path: string = "output.wav";
+    export_stems: bool = false;
     test_tone_duration: float = 1.0;
 }
 

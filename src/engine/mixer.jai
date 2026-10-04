@@ -436,6 +436,8 @@ clear_channel_buffers :: (mixer: *Mixer, frame_count: s64) {
         while frame_index < clamped_frame_count {
             channel.left_buffer[frame_index] = 0.0;
             channel.right_buffer[frame_index] = 0.0;
+            channel.output_left_buffer[frame_index] = 0.0;
+            channel.output_right_buffer[frame_index] = 0.0;
             frame_index += 1;
         }
 
@@ -449,6 +451,8 @@ clear_channel_buffers :: (mixer: *Mixer, frame_count: s64) {
         while frame_index < clamped_frame_count {
             aux.left_buffer[frame_index] = 0.0;
             aux.right_buffer[frame_index] = 0.0;
+            aux.output_left_buffer[frame_index] = 0.0;
+            aux.output_right_buffer[frame_index] = 0.0;
             frame_index += 1;
         }
 
@@ -544,8 +548,11 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                     left_sample, right_sample = process_studio_reverb(*channel.reverb, left_sample, right_sample);
                 }
 
-                mixer.master.left_buffer[frame_index] += left_sample * pan_gain_left;
-                mixer.master.right_buffer[frame_index] += right_sample * pan_gain_right;
+                processed_left := left_sample * pan_gain_left;
+                processed_right := right_sample * pan_gain_right;
+
+                mixer.master.left_buffer[frame_index] += processed_left;
+                mixer.master.right_buffer[frame_index] += processed_right;
 
                 send_index := 0;
                 while send_index < MAXIMUM_AUX_TRACKS {
@@ -562,6 +569,9 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
 
                     send_index += 1;
                 }
+
+                channel.output_left_buffer[frame_index] = processed_left;
+                channel.output_right_buffer[frame_index] = processed_right;
 
                 frame_index += 1;
             }
@@ -618,8 +628,14 @@ mix_channels_to_master :: (mixer: *Mixer, frame_count: s64) {
                     left_sample, right_sample = process_studio_reverb(*aux.reverb, left_sample, right_sample);
                 }
 
-                mixer.master.left_buffer[frame_index] += left_sample * pan_gain_left;
-                mixer.master.right_buffer[frame_index] += right_sample * pan_gain_right;
+                processed_left := left_sample * pan_gain_left;
+                processed_right := right_sample * pan_gain_right;
+
+                mixer.master.left_buffer[frame_index] += processed_left;
+                mixer.master.right_buffer[frame_index] += processed_right;
+
+                aux.output_left_buffer[frame_index] = processed_left;
+                aux.output_right_buffer[frame_index] = processed_right;
 
                 frame_index += 1;
             }
@@ -677,6 +693,36 @@ render_mixer_master_block_interleaved :: (mixer: *Mixer, output_buffer: [] float
     while frame_index < clamped_frame_count {
         output_buffer[frame_index * 2] = mixer.master.left_buffer[frame_index];
         output_buffer[frame_index * 2 + 1] = mixer.master.right_buffer[frame_index];
+        frame_index += 1;
+    }
+}
+
+render_channel_block_interleaved :: (channel: *Mixer_Channel, output_buffer: [] float, frame_count: s64) {
+    clamped_frame_count := frame_count;
+    maximum_output_frames := output_buffer.count / 2;
+    if clamped_frame_count > maximum_output_frames {
+        clamped_frame_count = maximum_output_frames;
+    }
+
+    frame_index := 0;
+    while frame_index < clamped_frame_count {
+        output_buffer[frame_index * 2] = channel.output_left_buffer[frame_index];
+        output_buffer[frame_index * 2 + 1] = channel.output_right_buffer[frame_index];
+        frame_index += 1;
+    }
+}
+
+render_aux_channel_block_interleaved :: (aux: *Aux_Channel, output_buffer: [] float, frame_count: s64) {
+    clamped_frame_count := frame_count;
+    maximum_output_frames := output_buffer.count / 2;
+    if clamped_frame_count > maximum_output_frames {
+        clamped_frame_count = maximum_output_frames;
+    }
+
+    frame_index := 0;
+    while frame_index < clamped_frame_count {
+        output_buffer[frame_index * 2] = aux.output_left_buffer[frame_index];
+        output_buffer[frame_index * 2 + 1] = aux.output_right_buffer[frame_index];
         frame_index += 1;
     }
 }
@@ -1242,6 +1288,8 @@ Aux_Channel :: struct {
     filter_enabled: bool = false;
     left_buffer: [MAXIMUM_BLOCK_SIZE] float;
     right_buffer: [MAXIMUM_BLOCK_SIZE] float;
+    output_left_buffer: [MAXIMUM_BLOCK_SIZE] float;
+    output_right_buffer: [MAXIMUM_BLOCK_SIZE] float;
 }
 
 Mixer_Channel :: struct {
@@ -1271,6 +1319,8 @@ Mixer_Channel :: struct {
     filter_enabled: bool = false;
     left_buffer: [MAXIMUM_BLOCK_SIZE] float;
     right_buffer: [MAXIMUM_BLOCK_SIZE] float;
+    output_left_buffer: [MAXIMUM_BLOCK_SIZE] float;
+    output_right_buffer: [MAXIMUM_BLOCK_SIZE] float;
 }
 
 Master_Channel :: struct {

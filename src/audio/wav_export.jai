@@ -291,11 +291,16 @@ export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: 
     configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
     sequencer.clock.is_looping = false;
 
-    voice_manager: Voice_Manager;
-    initialize_voice_manager(*voice_manager, sample_rate);
+    voice_manager := New(Voice_Manager);
+    defer free(voice_manager);
+    initialize_voice_manager(voice_manager, sample_rate);
 
-    mixer: Mixer;
-    configure_mixer_from_definition(*mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+    mixer := New(Mixer);
+    defer {
+        deinitialize_mixer(mixer);
+        free(mixer);
+    }
+    configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
 
     total_frames := calculate_total_clock_samples(*sequencer.clock);
     if total_frames == 0 {
@@ -319,13 +324,353 @@ export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: 
         slice.data = output_samples.data + rendered_frames * 2;
         slice.count = frames_to_render * 2;
 
-        render_sequencer_block(*sequencer, *song_specification, *voice_manager, *mixer, slice, frames_to_render);
+        render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, slice, frames_to_render);
         rendered_frames += frames_to_render;
     }
 
     write_success := write_wav_file_32_bit_float(output_wav_path, output_samples, 2, sample_rate);
 
     return write_success;
+}
+
+sanitize_stem_name :: (name: string) -> string {
+    if name.count == 0 {
+        return "";
+    }
+
+    result := alloc_string(name.count);
+    character_index := 0;
+    while character_index < name.count {
+        character := name[character_index];
+        if character >= #char "A" && character <= #char "Z" {
+            result[character_index] = character + 32;
+        } else if (character >= #char "a" && character <= #char "z") || (character >= #char "0" && character <= #char "9") || character == #char "_" || character == #char "-" {
+            result[character_index] = character;
+        } else {
+            result[character_index] = #char "_";
+        }
+
+        character_index += 1;
+    }
+
+    return result;
+}
+
+trim_trailing_slashes :: (path: string) -> string {
+    result := path;
+    while result.count > 0 && (result[result.count - 1] == #char "/" || result[result.count - 1] == #char "\\") {
+        result.count -= 1;
+    }
+
+    return result;
+}
+
+collect_song_stem_descriptors :: (song_specification: *Song_Specification) -> [..] Stem_Descriptor {
+    descriptors: [..] Stem_Descriptor;
+
+    track_index := 1;
+    while track_index <= MAXIMUM_TRACKS {
+        track_is_active := false;
+        track_name := "";
+
+        mixer_track, track_found := find_mixer_track(song_specification, track_index);
+        if track_found {
+            track_is_active = true;
+            track_name = mixer_track.name;
+        }
+
+        routing_index := 0;
+        while routing_index < song_specification.routings.count {
+            routing := *song_specification.routings[routing_index];
+            if routing.track_index == track_index {
+                track_is_active = true;
+                if track_name.count == 0 {
+                    track_name = routing.instrument_name;
+                }
+            }
+            routing_index += 1;
+        }
+
+        if !track_is_active && track_index == 1 && song_specification.instruments.count > 0 && song_specification.mixer.tracks.count == 0 && song_specification.routings.count == 0 {
+            track_is_active = true;
+        }
+
+        if track_is_active {
+            descriptor: Stem_Descriptor;
+            descriptor.stem_type = .TRACK;
+            descriptor.channel_index = track_index;
+            descriptor.name = track_name;
+
+            base_filename := "";
+            if track_name.count > 0 {
+                sanitized := sanitize_stem_name(track_name);
+                base_filename = sprint("%.wav", sanitized);
+                free(sanitized);
+            } else {
+                base_filename = sprint("track_%.wav", track_index);
+            }
+
+            collision := false;
+            search_index := 0;
+            while search_index < descriptors.count {
+                if descriptors[search_index].filename == base_filename {
+                    collision = true;
+                    break;
+                }
+                search_index += 1;
+            }
+
+            if collision || base_filename == "master.wav" {
+                free(base_filename);
+                if track_name.count > 0 {
+                    sanitized := sanitize_stem_name(track_name);
+                    base_filename = sprint("track_%_%.wav", track_index, sanitized);
+                    free(sanitized);
+                } else {
+                    base_filename = sprint("track_%.wav", track_index);
+                }
+            }
+
+            descriptor.filename = base_filename;
+            array_add(*descriptors, descriptor);
+        }
+
+        track_index += 1;
+    }
+
+    aux_index := 1;
+    while aux_index <= MAXIMUM_AUX_TRACKS {
+        aux_is_active := false;
+        aux_name := "";
+
+        aux_definition_index := 0;
+        while aux_definition_index < song_specification.mixer.aux_tracks.count {
+            aux_definition := *song_specification.mixer.aux_tracks[aux_definition_index];
+            if aux_definition.aux_index == aux_index {
+                aux_is_active = true;
+                aux_name = aux_definition.name;
+                break;
+            }
+            aux_definition_index += 1;
+        }
+
+        mixer_track_index := 0;
+        while mixer_track_index < song_specification.mixer.tracks.count {
+            track := *song_specification.mixer.tracks[mixer_track_index];
+            if track.send_levels[aux_index - 1] > 0.0 {
+                aux_is_active = true;
+            }
+            mixer_track_index += 1;
+        }
+
+        automation_index := 0;
+        while automation_index < song_specification.automation.curves.count {
+            curve := *song_specification.automation.curves[automation_index];
+            if curve.target_type == .TRACK_SEND && curve.aux_send_index == aux_index {
+                aux_is_active = true;
+            }
+            automation_index += 1;
+        }
+
+        if aux_is_active {
+            descriptor: Stem_Descriptor;
+            descriptor.stem_type = .AUX;
+            descriptor.channel_index = aux_index;
+            descriptor.name = aux_name;
+
+            base_filename := "";
+            if aux_name.count > 0 {
+                sanitized := sanitize_stem_name(aux_name);
+                base_filename = sprint("%.wav", sanitized);
+                free(sanitized);
+            } else {
+                base_filename = sprint("aux_%.wav", aux_index);
+            }
+
+            collision := false;
+            search_index := 0;
+            while search_index < descriptors.count {
+                if descriptors[search_index].filename == base_filename {
+                    collision = true;
+                    break;
+                }
+                search_index += 1;
+            }
+
+            if collision || base_filename == "master.wav" {
+                free(base_filename);
+                if aux_name.count > 0 {
+                    sanitized := sanitize_stem_name(aux_name);
+                    base_filename = sprint("aux_%_%.wav", aux_index, sanitized);
+                    free(sanitized);
+                } else {
+                    base_filename = sprint("aux_%.wav", aux_index);
+                }
+            }
+
+            descriptor.filename = base_filename;
+            array_add(*descriptors, descriptor);
+        }
+
+        aux_index += 1;
+    }
+
+    master_descriptor: Stem_Descriptor;
+    master_descriptor.stem_type = .MASTER;
+    master_descriptor.channel_index = 0;
+    master_descriptor.name = "master";
+    master_descriptor.filename = copy_string("master.wav");
+    array_add(*descriptors, master_descriptor);
+
+    return descriptors;
+}
+
+export_song_stems_to_wav :: (song_path: string, output_directory_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE) -> bool {
+    song_specification, parse_success, error_message := parse_song_from_file(song_path, check_samples_on_disk = true);
+    if !parse_success {
+        print("Export error: %\n", error_message);
+
+        return false;
+    }
+
+    sequencer: Sequencer;
+    configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+    sequencer.clock.is_looping = false;
+
+    voice_manager := New(Voice_Manager);
+    defer free(voice_manager);
+    initialize_voice_manager(voice_manager, sample_rate);
+
+    mixer := New(Mixer);
+    defer {
+        deinitialize_mixer(mixer);
+        free(mixer);
+    }
+    configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+    total_frames := calculate_total_clock_samples(*sequencer.clock);
+    if total_frames == 0 {
+        return false;
+    }
+
+    descriptors := collect_song_stem_descriptors(*song_specification);
+    if descriptors.count == 0 {
+        return false;
+    }
+    defer {
+        descriptor_index := 0;
+        while descriptor_index < descriptors.count {
+            free(descriptors[descriptor_index].filename);
+            descriptor_index += 1;
+        }
+        array_reset(*descriptors);
+    }
+
+    total_samples := cast(s64) total_frames * 2;
+    stem_buffers := NewArray(descriptors.count, [] float);
+    defer {
+        stem_buffer_index := 0;
+        while stem_buffer_index < descriptors.count {
+            free(stem_buffers[stem_buffer_index].data);
+            stem_buffer_index += 1;
+        }
+        free(stem_buffers.data);
+    }
+
+    descriptor_index := 0;
+    while descriptor_index < descriptors.count {
+        stem_buffers[descriptor_index] = NewArray(total_samples, float);
+        descriptor_index += 1;
+    }
+
+    block_size_in_frames: s64 = 512;
+    rendered_frames: s64 = 0;
+    master_block_buffer: [1024 * 2] float;
+
+    while rendered_frames < cast(s64) total_frames {
+        frames_to_render := cast(s64) total_frames - rendered_frames;
+        if frames_to_render > block_size_in_frames {
+            frames_to_render = block_size_in_frames;
+        }
+
+        master_slice: [] float;
+        master_slice.data = master_block_buffer.data;
+        master_slice.count = frames_to_render * 2;
+
+        render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, master_slice, frames_to_render);
+
+        frame_offset := rendered_frames * 2;
+        stem_index := 0;
+        while stem_index < descriptors.count {
+            descriptor := *descriptors[stem_index];
+            destination_buffer := stem_buffers[stem_index];
+
+            target_slice: [] float;
+            target_slice.data = destination_buffer.data + frame_offset;
+            target_slice.count = frames_to_render * 2;
+
+            if descriptor.stem_type == {
+                case .TRACK;
+                    channel, channel_found := find_mixer_channel(mixer, descriptor.channel_index);
+                    if channel_found {
+                        render_channel_block_interleaved(channel, target_slice, frames_to_render);
+                    }
+
+                case .AUX;
+                    aux, aux_found := find_mixer_aux_channel(mixer, descriptor.channel_index);
+                    if aux_found {
+                        render_aux_channel_block_interleaved(aux, target_slice, frames_to_render);
+                    }
+
+                case .MASTER;
+                    sample_index := 0;
+                    while sample_index < frames_to_render * 2 {
+                        target_slice[sample_index] = master_slice[sample_index];
+                        sample_index += 1;
+                    }
+            }
+
+            stem_index += 1;
+        }
+
+        rendered_frames += frames_to_render;
+    }
+
+    clean_directory := trim_trailing_slashes(output_directory_path);
+    if clean_directory.count == 0 {
+        clean_directory = ".";
+    }
+    make_directory_if_it_does_not_exist(clean_directory, recursive = true);
+
+    all_written_successfully := true;
+    stem_index := 0;
+    while stem_index < descriptors.count {
+        descriptor := *descriptors[stem_index];
+        destination_path := sprint("%/%", clean_directory, descriptor.filename);
+        defer free(destination_path);
+
+        write_success := write_wav_file_32_bit_float(destination_path, stem_buffers[stem_index], 2, sample_rate);
+        if !write_success {
+            all_written_successfully = false;
+        }
+
+        stem_index += 1;
+    }
+
+    return all_written_successfully;
+}
+
+Stem_Type :: enum {
+    TRACK;
+    AUX;
+    MASTER;
+}
+
+Stem_Descriptor :: struct {
+    stem_type: Stem_Type = .TRACK;
+    channel_index: s64 = 1;
+    name: string;
+    filename: string;
 }
 
 Wav_Header :: struct {
