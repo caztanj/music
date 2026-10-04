@@ -278,6 +278,29 @@ hot_reloader_apply_state_to_engine :: (state: *Song_State, sequencer: *Sequencer
             } else {
                 channel.delay_enabled = false;
             }
+
+            if track_definition.filter_enabled {
+                channel.filter_enabled = true;
+                filter_type := track_definition.filter_type;
+                if filter_type == .NONE {
+                    filter_type = .LOWPASS;
+                }
+                configure_filter_insert(
+                    *channel.filter_insert,
+                    filter_type,
+                    track_definition.filter_cutoff_frequency_hertz,
+                    track_definition.filter_resonance
+                );
+            } else {
+                channel.filter_enabled = false;
+            }
+
+            send_index := 0;
+            while send_index < MAXIMUM_AUX_TRACKS {
+                channel.send_levels[send_index] = track_definition.send_levels[send_index];
+                channel.send_pre_fader[send_index] = track_definition.send_pre_fader[send_index];
+                send_index += 1;
+            }
         }
 
         track_index += 1;

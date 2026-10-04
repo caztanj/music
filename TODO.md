@@ -131,8 +131,8 @@
 - [x] **15.2 Timeline Curve Interpolation (`src/engine/sequencer.jai`)**
   - [x] Linear, exponential, and logarithmic curve shapes calculated sample-accurately during block rendering.
   - [x] Target parameters: Channel Gain, Pan, Filter Cutoff/Resonance, Send Levels, and Master Tempo.
-- [ ] **15.3 Live Hot-Reload Verification**
-  - [ ] Editing automation points in real time updates the playback curves smoothly without audio clicks.
+- [x] **15.3 Live Hot-Reload Verification**
+  - [x] Editing automation points in real time updates the playback curves smoothly without audio clicks.
 
 **Acceptance Criteria**: An 8-bar build-up filter sweep rises smoothly and peaks precisely on the first beat of the drop.
 

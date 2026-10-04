@@ -244,6 +244,153 @@ watcher_tests :: () {
         hot_reloader_shutdown(*hot_reloader);
         file_delete(temporary_file_path);
     });
+
+    test("hot_reloading_automation_curves_updates_playback_smoothly_without_glitches", () {
+        temporary_file_path := "temporary_hot_reload_automation_test.song";
+
+        initial_song := #string END
+[project]
+name = "Hot Reload Automation"
+bpm = 120
+bars = 8
+
+[instruments]
+lead = synth(wave="saw", attack=5, decay=100, sustain=0.5, release=100)
+
+[pattern melody]
+lead | x . . . |
+
+[mixer]
+track 1 (lead): gain = 0.5, pan = 0.0, filter = "lowpass", cutoff = 200, resonance = 0.2
+master: gain = 1.0
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1-8: melody
+
+[automation]
+automate track 1.filter_cutoff from 200 to 2000 over bar 1-4 curve=linear
+automate track 1.gain from 0.2 to 0.6 over bar 1-4 curve=linear
+END;
+
+        write_entire_file(temporary_file_path, initial_song);
+
+        hot_reloader: Hot_Reloader;
+        reloader_initialized := hot_reloader_initialize(*hot_reloader, temporary_file_path, 44100);
+        expect_true(reloader_initialized);
+
+        sequencer: Sequencer;
+        initialize_sequencer_clock(*sequencer.clock, 44100, 120.0, 8);
+        initialize_sample_pool(*sequencer.sample_pool);
+
+        voice_manager: Voice_Manager;
+        initialize_voice_manager(*voice_manager, 44100);
+
+        mixer: Mixer;
+        initialize_mixer(*mixer, 44100);
+
+        last_applied_version: u64 = 0;
+        output_buffer: [512] float;
+
+        render_audio_block_with_hot_reload(
+            *hot_reloader,
+            *sequencer,
+            *voice_manager,
+            *mixer,
+            output_buffer,
+            256,
+            *last_applied_version
+        );
+
+        expect_equals(last_applied_version, 1);
+        channel, channel_found := find_mixer_channel(*mixer, 1);
+        expect_true(channel_found);
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, 200.0, 5.0);
+        expect_near(channel.gain, 0.2, 0.02);
+
+        samples_per_bar := cast(u64) calculate_samples_per_bar(44100, 120.0, 4);
+        bar_3_sample := 2 * samples_per_bar;
+        seek_sequencer_clock(*sequencer.clock, bar_3_sample);
+
+        render_audio_block_with_hot_reload(
+            *hot_reloader,
+            *sequencer,
+            *voice_manager,
+            *mixer,
+            output_buffer,
+            256,
+            *last_applied_version
+        );
+
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, 1100.0, 15.0);
+        expect_near(channel.gain, 0.4, 0.02);
+
+        updated_song := #string END
+[project]
+name = "Hot Reload Automation"
+bpm = 120
+bars = 8
+
+[instruments]
+lead = synth(wave="saw", attack=5, decay=100, sustain=0.5, release=100)
+
+[pattern melody]
+lead | x . . . |
+
+[mixer]
+track 1 (lead): gain = 0.5, pan = 0.0, filter = "lowpass", cutoff = 200, resonance = 0.2
+master: gain = 1.0
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1-8: melody
+
+[automation]
+automate track 1.filter_cutoff from 200 to 8000 over bar 1-4 curve=exponential
+automate track 1.gain from 0.0 to 1.0 over bar 1-4 curve=linear
+END;
+
+        write_entire_file(temporary_file_path, updated_song);
+        hot_reloader_reload_file(*hot_reloader);
+
+        render_audio_block_with_hot_reload(
+            *hot_reloader,
+            *sequencer,
+            *voice_manager,
+            *mixer,
+            output_buffer,
+            256,
+            *last_applied_version
+        );
+
+        expect_equals(last_applied_version, 2);
+        expected_geometric_midpoint := 200.0 * sqrt(40.0);
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, expected_geometric_midpoint, 15.0);
+        expect_near(channel.gain, 0.5, 0.02);
+
+        bar_5_sample := 4 * samples_per_bar;
+        seek_sequencer_clock(*sequencer.clock, bar_5_sample);
+
+        render_audio_block_with_hot_reload(
+            *hot_reloader,
+            *sequencer,
+            *voice_manager,
+            *mixer,
+            output_buffer,
+            256,
+            *last_applied_version
+        );
+
+        expect_near(channel.filter_insert.cutoff_frequency_hertz, 8000.0, 20.0);
+        expect_near(channel.gain, 1.0, 0.02);
+
+        hot_reloader_shutdown(*hot_reloader);
+        file_delete(temporary_file_path);
+    });
 }
 
 Watcher_Test_Context :: struct {
