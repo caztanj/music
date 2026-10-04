@@ -342,6 +342,107 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
             continue;
         }
 
+        if argument_token.type == .IDENTIFIER && (argument_token.text == "zone" || argument_token.text == "sample") && peek_token(parser, 1).type == .OPEN_PARENTHESIS {
+            advance_token(parser);
+            consume_token(parser, .OPEN_PARENTHESIS, "Expected '(' after zone");
+            path_token, path_success := consume_token(parser, .STRING, "Expected string for zone sample file path");
+            if !path_success return false;
+
+            zone: Sample_Zone;
+            zone.sample_file_path = path_token.string_value;
+            zone.root_midi_note = 60;
+            zone.key_low = 0;
+            zone.key_high = 127;
+
+            while !parser.has_error && parser.current_token_index < parser.tokens.count {
+                next_token := current_token(parser);
+                if next_token.type == .CLOSE_PARENTHESIS {
+                    advance_token(parser);
+                    break;
+                }
+
+                comma_token, comma_success := consume_token(parser, .COMMA, "Expected ',' between zone arguments");
+                if !comma_success return false;
+
+                parameter_token := current_token(parser);
+                if parameter_token.type != .IDENTIFIER {
+                    set_error(parser, parameter_token.location, "Expected parameter name in zone");
+                    return false;
+                }
+                zone_parameter_name := parameter_token.text;
+                advance_token(parser);
+
+                equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after zone parameter name");
+                if !equals_success return false;
+
+                if zone_parameter_name == "root" || zone_parameter_name == "root_note" {
+                    root_token := current_token(parser);
+                    if root_token.type == .INTEGER {
+                        zone.root_midi_note = cast(s32) root_token.integer_value;
+                        advance_token(parser);
+                    } else if root_token.type == .IDENTIFIER || root_token.type == .STRING {
+                        note_string := ifx root_token.type == .STRING then root_token.string_value else root_token.text;
+                        midi_number := note_to_midi(note_string);
+                        if midi_number < 0 {
+                            set_error(parser, root_token.location, sprint("Invalid root note '%'", note_string));
+                            return false;
+                        }
+                        zone.root_midi_note = midi_number;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, root_token.location, "Expected note name or integer for zone root note");
+                        return false;
+                    }
+                } else if zone_parameter_name == "low" || zone_parameter_name == "key_low" || zone_parameter_name == "min" {
+                    low_token := current_token(parser);
+                    if low_token.type == .INTEGER {
+                        zone.key_low = cast(s32) low_token.integer_value;
+                        advance_token(parser);
+                    } else if low_token.type == .IDENTIFIER || low_token.type == .STRING {
+                        note_string := ifx low_token.type == .STRING then low_token.string_value else low_token.text;
+                        midi_number := note_to_midi(note_string);
+                        if midi_number < 0 {
+                            set_error(parser, low_token.location, sprint("Invalid low note '%'", note_string));
+                            return false;
+                        }
+                        zone.key_low = midi_number;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, low_token.location, "Expected note or integer for zone key low");
+                        return false;
+                    }
+                } else if zone_parameter_name == "high" || zone_parameter_name == "key_high" || zone_parameter_name == "max" {
+                    high_token := current_token(parser);
+                    if high_token.type == .INTEGER {
+                        zone.key_high = cast(s32) high_token.integer_value;
+                        advance_token(parser);
+                    } else if high_token.type == .IDENTIFIER || high_token.type == .STRING {
+                        note_string := ifx high_token.type == .STRING then high_token.string_value else high_token.text;
+                        midi_number := note_to_midi(note_string);
+                        if midi_number < 0 {
+                            set_error(parser, high_token.location, sprint("Invalid high note '%'", note_string));
+                            return false;
+                        }
+                        zone.key_high = midi_number;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, high_token.location, "Expected note or integer for zone key high");
+                        return false;
+                    }
+                } else {
+                    set_error(parser, parameter_token.location, sprint("Unknown zone parameter '%'", zone_parameter_name));
+                    return false;
+                }
+            }
+
+            array_add(*sampler_configuration.zones, zone);
+            if sampler_configuration.sample_file_path.count == 0 {
+                sampler_configuration.sample_file_path = zone.sample_file_path;
+                sampler_configuration.root_midi_note = zone.root_midi_note;
+            }
+            continue;
+        }
+
         if argument_token.type != .IDENTIFIER {
             set_error(parser, argument_token.location, "Expected parameter name or sample file path");
             return false;
@@ -537,6 +638,16 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
             if current_token(parser).type == .IDENTIFIER && current_token(parser).text == "ms" {
                 advance_token(parser);
             }
+        } else if parameter_name == "interpolation" || parameter_name == "interp" || parameter_name == "mode" || parameter_name == "interpolate" {
+            mode_token := current_token(parser);
+            mode_name := ifx mode_token.type == .STRING then mode_token.string_value else mode_token.text;
+            parsed_mode, parse_success := string_to_sampler_interpolation_mode(mode_name);
+            if !parse_success {
+                set_error(parser, mode_token.location, sprint("Unknown interpolation mode '%', expected 'linear' or 'cubic'", mode_name));
+                return false;
+            }
+            sampler_configuration.interpolation = parsed_mode;
+            advance_token(parser);
         } else {
             set_error(parser, argument_token.location, sprint("Unknown sampler parameter '%'", parameter_name));
             return false;
@@ -2677,7 +2788,17 @@ validate_song_specification :: (parser: *Parser, song_specification: *Song_Speci
         while instrument_index < song_specification.instruments.count {
             instrument := *song_specification.instruments[instrument_index];
             if instrument.type == .SAMPLER {
-                if !file_exists_on_disk(instrument.sampler.sample_file_path) {
+                if instrument.sampler.zones.count > 0 {
+                    zone_index := 0;
+                    while zone_index < instrument.sampler.zones.count {
+                        zone := *instrument.sampler.zones[zone_index];
+                        if !file_exists_on_disk(zone.sample_file_path) {
+                            set_error(parser, instrument.location, sprint("Sample file '%' does not exist on disk", zone.sample_file_path));
+                            return false;
+                        }
+                        zone_index += 1;
+                    }
+                } else if !file_exists_on_disk(instrument.sampler.sample_file_path) {
                     set_error(parser, instrument.location, sprint("Sample file '%' does not exist on disk", instrument.sampler.sample_file_path));
                     return false;
                 }

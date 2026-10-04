@@ -137,10 +137,12 @@ initialize_sampler_voice :: (voice: *Sampler_Voice, sample_rate: s64 = DEFAULT_S
     voice.loop_end_frame = 0;
     voice.start_offset_frame = 0;
     voice.is_reversed = false;
+    voice.root_midi_note = 60;
+    voice.interpolation = .CUBIC;
     reset_envelope(*voice.envelope);
 }
 
-trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0, envelope_configuration: Envelope_Configuration = .{}, has_envelope: bool = false, is_looping: bool = false, loop_start_frame: s64 = 0, loop_end_frame: s64 = 0, start_offset_frame: s64 = 0, is_reversed: bool = false) {
+trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0, envelope_configuration: Envelope_Configuration = .{}, has_envelope: bool = false, is_looping: bool = false, loop_start_frame: s64 = 0, loop_end_frame: s64 = 0, start_offset_frame: s64 = 0, is_reversed: bool = false, root_midi_note: s32 = -1, interpolation: Sampler_Interpolation_Mode = .CUBIC) {
     voice.buffer = buffer;
     voice.velocity = velocity;
     voice.gain = gain;
@@ -153,6 +155,10 @@ trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer,
     voice.loop_end_frame = loop_end_frame;
     voice.start_offset_frame = start_offset_frame;
     voice.is_reversed = is_reversed;
+
+    effective_root := ifx root_midi_note >= 0 then root_midi_note else (ifx buffer != null then buffer.root_midi_note else 60);
+    voice.root_midi_note = effective_root;
+    voice.interpolation = interpolation;
 
     total_frames: s64 = ifx buffer != null then buffer.frame_count else 0;
     clamped_offset := start_offset_frame;
@@ -172,7 +178,7 @@ trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer,
     }
 
     if buffer != null && buffer.sample_rate > 0 && voice.sample_rate > 0 {
-        semitone_difference := cast(float64) (midi_note_number - buffer.root_midi_note);
+        semitone_difference := cast(float64) (midi_note_number - effective_root);
         pitch_ratio := pow(2.0, semitone_difference / 12.0);
         sample_rate_ratio := cast(float64) buffer.sample_rate / cast(float64) voice.sample_rate;
         voice.playback_speed = pitch_ratio * sample_rate_ratio;
@@ -207,6 +213,8 @@ reset_sampler_voice :: (voice: *Sampler_Voice) {
     voice.loop_end_frame = 0;
     voice.start_offset_frame = 0;
     voice.is_reversed = false;
+    voice.root_midi_note = 60;
+    voice.interpolation = .CUBIC;
     reset_envelope(*voice.envelope);
 }
 
@@ -292,11 +300,35 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
 
     sample_0_left := get_sample_from_buffer(voice.buffer, frame_index_0, 0);
     sample_1_left := get_sample_from_buffer(voice.buffer, frame_index_1, 0);
-    interpolated_left := sample_0_left + fractional_part * (sample_1_left - sample_0_left);
-
     sample_0_right := get_sample_from_buffer(voice.buffer, frame_index_0, 1);
     sample_1_right := get_sample_from_buffer(voice.buffer, frame_index_1, 1);
-    interpolated_right := sample_0_right + fractional_part * (sample_1_right - sample_0_right);
+
+    interpolated_left: float = 0.0;
+    interpolated_right: float = 0.0;
+
+    if voice.interpolation == .LINEAR {
+        interpolated_left = sample_0_left + fractional_part * (sample_1_left - sample_0_left);
+        interpolated_right = sample_0_right + fractional_part * (sample_1_right - sample_0_right);
+    } else {
+        frame_index_minus_1 := frame_index_0 - 1;
+        frame_index_plus_2 := frame_index_1 + 1;
+
+        if voice.is_looping && effective_loop_end > effective_loop_start {
+            if frame_index_minus_1 < effective_loop_start frame_index_minus_1 = effective_loop_end - 1;
+            if frame_index_plus_2 >= effective_loop_end frame_index_plus_2 = effective_loop_start;
+        } else {
+            if frame_index_minus_1 < 0 frame_index_minus_1 = 0;
+            if frame_index_plus_2 >= voice.buffer.frame_count frame_index_plus_2 = voice.buffer.frame_count - 1;
+        }
+
+        sample_minus_1_left := get_sample_from_buffer(voice.buffer, frame_index_minus_1, 0);
+        sample_plus_2_left := get_sample_from_buffer(voice.buffer, frame_index_plus_2, 0);
+        interpolated_left = interpolate_cubic(sample_minus_1_left, sample_0_left, sample_1_left, sample_plus_2_left, fractional_part);
+
+        sample_minus_1_right := get_sample_from_buffer(voice.buffer, frame_index_minus_1, 1);
+        sample_plus_2_right := get_sample_from_buffer(voice.buffer, frame_index_plus_2, 1);
+        interpolated_right = interpolate_cubic(sample_minus_1_right, sample_0_right, sample_1_right, sample_plus_2_right, fractional_part);
+    }
 
     envelope_factor: float = 1.0;
     if voice.has_envelope {
@@ -342,6 +374,15 @@ render_sampler_block_interleaved :: (voice: *Sampler_Voice, output_buffer: [] fl
         output_buffer[sample_index + 1] += right;
         sample_index += 2;
     }
+}
+
+interpolate_cubic :: (point_0: float, point_1: float, point_2: float, point_3: float, fraction: float) -> float {
+    coefficient_0 := -0.5 * point_0 + 1.5 * point_1 - 1.5 * point_2 + 0.5 * point_3;
+    coefficient_1 := point_0 - 2.5 * point_1 + 2.0 * point_2 - 0.5 * point_3;
+    coefficient_2 := -0.5 * point_0 + 0.5 * point_2;
+    coefficient_3 := point_1;
+
+    return ((coefficient_0 * fraction + coefficient_1) * fraction + coefficient_2) * fraction + coefficient_3;
 }
 
 calculate_sampler_start_offset_frame :: (configuration: Sampler_Configuration, buffer: *Audio_Sample_Buffer) -> s64 {
@@ -399,4 +440,6 @@ Sampler_Voice :: struct {
     loop_end_frame: s64 = 0;
     start_offset_frame: s64 = 0;
     is_reversed: bool = false;
+    root_midi_note: s32 = 60;
+    interpolation: Sampler_Interpolation_Mode = .CUBIC;
 }

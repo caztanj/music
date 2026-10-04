@@ -211,24 +211,64 @@ initialize_sample_pool :: (pool: *Sample_Pool) {
     pool.entry_count = 0;
 }
 
-find_sample_in_pool :: (pool: *Sample_Pool, instrument_name: string) -> *Audio_Sample_Buffer, bool {
+find_sample_in_pool :: (pool: *Sample_Pool, instrument_name: string, midi_note_number: s32 = -1) -> *Audio_Sample_Buffer, bool {
+    if pool == null || pool.entry_count == 0 {
+        return null, false;
+    }
+
+    if midi_note_number < 0 {
+        index := 0;
+        while index < pool.entry_count {
+            if pool.entries[index].instrument_name == instrument_name {
+                return *pool.entries[index].buffer, true;
+            }
+
+            index += 1;
+        }
+
+        return null, false;
+    }
+
+    best_index := -1;
+    min_distance := 10000;
+
     index := 0;
     while index < pool.entry_count {
-        if pool.entries[index].instrument_name == instrument_name {
-            return *pool.entries[index].buffer, true;
+        entry := *pool.entries[index];
+        if entry.instrument_name == instrument_name {
+            if midi_note_number >= entry.key_low && midi_note_number <= entry.key_high {
+                return *entry.buffer, true;
+            }
+
+            difference := midi_note_number - entry.root_midi_note;
+            distance := ifx difference < 0 then -difference else difference;
+            if distance < min_distance {
+                min_distance = distance;
+                best_index = index;
+            }
         }
 
         index += 1;
     }
 
+    if best_index >= 0 {
+        return *pool.entries[best_index].buffer, true;
+    }
+
     return null, false;
 }
 
-add_sample_to_pool :: (pool: *Sample_Pool, instrument_name: string, buffer: Audio_Sample_Buffer) -> bool {
-    existing, found := find_sample_in_pool(pool, instrument_name);
-    if found {
-        existing.* = buffer;
-        return true;
+add_sample_to_pool :: (pool: *Sample_Pool, instrument_name: string, buffer: Audio_Sample_Buffer, root_midi_note: s32 = 60, key_low: s32 = 0, key_high: s32 = 127) -> bool {
+    index := 0;
+    while index < pool.entry_count {
+        entry := *pool.entries[index];
+        if entry.instrument_name == instrument_name && entry.root_midi_note == root_midi_note && entry.key_low == key_low && entry.key_high == key_high {
+            entry.buffer = buffer;
+
+            return true;
+        }
+
+        index += 1;
     }
 
     if pool.entry_count >= MAXIMUM_SAMPLE_POOL_ENTRIES {
@@ -237,6 +277,9 @@ add_sample_to_pool :: (pool: *Sample_Pool, instrument_name: string, buffer: Audi
 
     pool.entries[pool.entry_count].instrument_name = instrument_name;
     pool.entries[pool.entry_count].buffer = buffer;
+    pool.entries[pool.entry_count].root_midi_note = root_midi_note;
+    pool.entries[pool.entry_count].key_low = key_low;
+    pool.entries[pool.entry_count].key_high = key_high;
     pool.entry_count += 1;
 
     return true;
@@ -247,10 +290,23 @@ load_samples_for_song :: (pool: *Sample_Pool, song_specification: *Song_Specific
     while instrument_index < song_specification.instruments.count {
         instrument := *song_specification.instruments[instrument_index];
         if instrument.type == .SAMPLER {
-            buffer, load_success := load_wav_file(instrument.sampler.sample_file_path);
-            if load_success {
-                buffer.root_midi_note = instrument.sampler.root_midi_note;
-                add_sample_to_pool(pool, instrument.name, buffer);
+            if instrument.sampler.zones.count > 0 {
+                zone_index := 0;
+                while zone_index < instrument.sampler.zones.count {
+                    zone := *instrument.sampler.zones[zone_index];
+                    buffer, load_success := load_wav_file(zone.sample_file_path);
+                    if load_success {
+                        buffer.root_midi_note = zone.root_midi_note;
+                        add_sample_to_pool(pool, instrument.name, buffer, zone.root_midi_note, zone.key_low, zone.key_high);
+                    }
+                    zone_index += 1;
+                }
+            } else if instrument.sampler.sample_file_path.count > 0 {
+                buffer, load_success := load_wav_file(instrument.sampler.sample_file_path);
+                if load_success {
+                    buffer.root_midi_note = instrument.sampler.root_midi_note;
+                    add_sample_to_pool(pool, instrument.name, buffer, instrument.sampler.root_midi_note, 0, 127);
+                }
             }
         }
 
@@ -604,7 +660,7 @@ dispatch_sequencer_event :: (event: *Sequencer_Event, song_specification: *Song_
 
                     case .SAMPLER;
                         if sample_pool != null {
-                            buffer, buffer_found := find_sample_in_pool(sample_pool, event.instrument_name);
+                            buffer, buffer_found := find_sample_in_pool(sample_pool, event.instrument_name, event.midi_note_number);
                             if buffer_found {
                                 trigger_sampler_note(voice_manager, event.instrument_name, event.mixer_track_index, buffer, instrument.sampler, event.midi_note_number, event.velocity);
                             }
@@ -683,7 +739,7 @@ render_sequencer_block :: (sequencer: *Sequencer, song_specification: *Song_Spec
 }
 
 MAXIMUM_SEQUENCER_EVENTS_PER_BLOCK :: 512;
-MAXIMUM_SAMPLE_POOL_ENTRIES :: 64;
+MAXIMUM_SAMPLE_POOL_ENTRIES :: 128;
 
 Sequencer_Event_Type :: enum {
     NOTE_OFF;
@@ -715,6 +771,9 @@ Sequencer_Clock :: struct {
 Sample_Pool_Entry :: struct {
     instrument_name: string;
     buffer: Audio_Sample_Buffer;
+    root_midi_note: s32 = 60;
+    key_low: s32 = 0;
+    key_high: s32 = 127;
 }
 
 Sample_Pool :: struct {

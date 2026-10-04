@@ -196,6 +196,18 @@ string_to_lfo_destination :: (name: string) -> LFO_Destination, bool {
     return .NONE, false;
 }
 
+string_to_sampler_interpolation_mode :: (name: string) -> Sampler_Interpolation_Mode, bool {
+    if name == "cubic" || name == "spline" || name == "hermite" {
+        return .CUBIC, true;
+    }
+
+    if name == "linear" || name == "lerp" {
+        return .LINEAR, true;
+    }
+
+    return .CUBIC, false;
+}
+
 waveform_type_to_string :: (waveform_type: Waveform_Type) -> string {
     if waveform_type == {
         case .SAWTOOTH;
@@ -448,6 +460,18 @@ LFO_Configuration :: struct {
     retrigger: bool = true;
 }
 
+Sampler_Interpolation_Mode :: enum {
+    LINEAR;
+    CUBIC;
+}
+
+Sample_Zone :: struct {
+    sample_file_path: string;
+    root_midi_note: s32 = 60;
+    key_low: s32 = 0;
+    key_high: s32 = 127;
+}
+
 Sampler_Configuration :: struct {
     sample_file_path: string;
     gain: float = 1.0;
@@ -464,6 +488,8 @@ Sampler_Configuration :: struct {
     start_offset_percentage: float = 0.0;
     start_offset_is_percentage: bool = false;
     is_reversed: bool = false;
+    interpolation: Sampler_Interpolation_Mode = .CUBIC;
+    zones: [..] Sample_Zone;
 }
 
 Synthesizer_Configuration :: struct {

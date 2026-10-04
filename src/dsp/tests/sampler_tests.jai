@@ -303,4 +303,92 @@ sampler_tests :: () {
         second_offset_sample := render_sampler_sample(*voice);
         expect_near(second_offset_sample, 6.0, 0.001);
     });
+
+    test("sampler_cubic_and_linear_pitch_interpolation", () {
+        raw_samples := NewArray(4, float);
+        raw_samples[0] = 0.0;
+        raw_samples[1] = 1.0;
+        raw_samples[2] = 0.0;
+        raw_samples[3] = -1.0;
+
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        linear_voice: Sampler_Voice;
+        initialize_sampler_voice(*linear_voice, 44100);
+        trigger_sampler_note_on(*linear_voice, *buffer, 60, 1.0, is_one_shot = true, gain = 1.0, interpolation = .LINEAR);
+        linear_voice.playhead_frame = 1.5;
+        linear_sample := render_sampler_sample(*linear_voice);
+        expect_near(linear_sample, 0.5, 0.001);
+
+        cubic_voice: Sampler_Voice;
+        initialize_sampler_voice(*cubic_voice, 44100);
+        trigger_sampler_note_on(*cubic_voice, *buffer, 60, 1.0, is_one_shot = true, gain = 1.0, interpolation = .CUBIC);
+        cubic_voice.playhead_frame = 1.5;
+        cubic_sample := render_sampler_sample(*cubic_voice);
+        cubic_interpolated := interpolate_cubic(0.0, 1.0, 0.0, -1.0, 0.5);
+        expect_near(cubic_sample, cubic_interpolated, 0.001);
+        expect_near(cubic_sample, 0.625, 0.001);
+    });
+
+    test("sampler_multi_octave_pitch_tracking", () {
+        raw_samples := NewArray(10, float);
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        voice: Sampler_Voice;
+        initialize_sampler_voice(*voice, 44100);
+
+        trigger_sampler_note_on(*voice, *buffer, 72, 1.0);
+        expect_near(cast(float) voice.playback_speed, 2.0, 0.001);
+
+        trigger_sampler_note_on(*voice, *buffer, 84, 1.0);
+        expect_near(cast(float) voice.playback_speed, 4.0, 0.001);
+
+        trigger_sampler_note_on(*voice, *buffer, 48, 1.0);
+        expect_near(cast(float) voice.playback_speed, 0.5, 0.001);
+
+        trigger_sampler_note_on(*voice, *buffer, 36, 1.0);
+        expect_near(cast(float) voice.playback_speed, 0.25, 0.001);
+
+        trigger_sampler_note_on(*voice, *buffer, 72, 1.0, root_midi_note = 72);
+        expect_near(cast(float) voice.playback_speed, 1.0, 0.001);
+
+        trigger_sampler_note_on(*voice, *buffer, 60, 1.0, root_midi_note = 48);
+        expect_near(cast(float) voice.playback_speed, 2.0, 0.001);
+    });
+
+    test("sample_pool_multi_sample_zone_selection", () {
+        pool: Sample_Pool;
+        initialize_sample_pool(*pool);
+
+        samples_c2 := NewArray(4, float);
+        samples_c2[0] = 2.0;
+        buffer_c2 := create_audio_sample_buffer(samples_c2, 1, 44100, 36);
+
+        samples_c4 := NewArray(4, float);
+        samples_c4[0] = 4.0;
+        buffer_c4 := create_audio_sample_buffer(samples_c4, 1, 44100, 60);
+
+        samples_c6 := NewArray(4, float);
+        samples_c6[0] = 6.0;
+        buffer_c6 := create_audio_sample_buffer(samples_c6, 1, 44100, 84);
+
+        add_sample_to_pool(*pool, "piano", buffer_c2, 36, 0, 47);
+        add_sample_to_pool(*pool, "piano", buffer_c4, 60, 48, 71);
+        add_sample_to_pool(*pool, "piano", buffer_c6, 84, 72, 127);
+
+        found_c2, ok_c2 := find_sample_in_pool(*pool, "piano", 40);
+        expect_true(ok_c2);
+        expect_equals(found_c2.root_midi_note, 36);
+        expect_near(found_c2.samples[0], 2.0, 0.001);
+
+        found_c4, ok_c4 := find_sample_in_pool(*pool, "piano", 64);
+        expect_true(ok_c4);
+        expect_equals(found_c4.root_midi_note, 60);
+        expect_near(found_c4.samples[0], 4.0, 0.001);
+
+        found_c6, ok_c6 := find_sample_in_pool(*pool, "piano", 88);
+        expect_true(ok_c6);
+        expect_equals(found_c6.root_midi_note, 84);
+        expect_near(found_c6.samples[0], 6.0, 0.001);
+    });
 }

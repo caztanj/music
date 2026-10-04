@@ -96,7 +96,9 @@ trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string,
         loop_start_frame = configuration.loop_start_frame,
         loop_end_frame = configuration.loop_end_frame,
         start_offset_frame = start_offset_frame,
-        is_reversed = configuration.is_reversed
+        is_reversed = configuration.is_reversed,
+        root_midi_note = configuration.root_midi_note,
+        interpolation = configuration.interpolation
     );
 
     return slot;

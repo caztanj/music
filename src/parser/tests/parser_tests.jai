@@ -568,5 +568,52 @@ END;
         expect_true(perc_hit.sampler.start_offset_is_percentage);
         expect_near(perc_hit.sampler.start_offset_percentage, 0.5, 0.001);
     });
+
+    test("sampler_multi_sample_zones_and_interpolation_parsing", () {
+        song_text := #string END
+[project]
+name = "Multi-Sample Zones Test"
+bpm = 120
+time_signature = 4/4
+bars = 1
+
+[instruments]
+piano = sampler(zone("samples/piano_c2.wav", root = C2, low = 0, high = 47), zone("samples/piano_c4.wav", root = C4, low = 48, high = 71), zone("samples/piano_c6.wav", root = C6, low = 72, high = 127), interpolation = cubic)
+rhodes = sampler("samples/rhodes.wav", root = A3, interpolation = linear)
+
+[pattern main]
+piano | x . . . |
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+piano -> track 1
+rhodes -> track 1
+
+[arrangement]
+bar 1: main
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "multi_sample_test.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        piano, piano_found := find_instrument(*song_specification, "piano");
+        expect_true(piano_found);
+        expect_equals(piano.sampler.zones.count, 3);
+        expect_equals(piano.sampler.zones[0].sample_file_path, "samples/piano_c2.wav");
+        expect_equals(piano.sampler.zones[0].root_midi_note, 36);
+        expect_equals(piano.sampler.zones[0].key_low, 0);
+        expect_equals(piano.sampler.zones[0].key_high, 47);
+        expect_equals(piano.sampler.zones[1].root_midi_note, 60);
+        expect_equals(piano.sampler.zones[2].root_midi_note, 84);
+        expect_equals(piano.sampler.interpolation, Sampler_Interpolation_Mode.CUBIC);
+
+        rhodes, rhodes_found := find_instrument(*song_specification, "rhodes");
+        expect_true(rhodes_found);
+        expect_equals(rhodes.sampler.root_midi_note, 57);
+        expect_equals(rhodes.sampler.interpolation, Sampler_Interpolation_Mode.LINEAR);
+    });
 }
 

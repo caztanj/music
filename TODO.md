@@ -112,8 +112,8 @@
 - [x] **14.3 Sample Manipulation Parameters**
   - [x] Sample start offset (skip silent intros or slice sample attacks).
   - [x] Reverse playback flag (for reverse cymbals, snare swells, and transitional risers).
-- [ ] **14.4 Multi-Sample Pitch Tracking**
-  - [ ] Root note assignment and linear/cubic pitch interpolation across octaves for realistic acoustic or piano playback.
+- [x] **14.4 Multi-Sample Pitch Tracking**
+  - [x] Root note assignment and linear/cubic pitch interpolation across octaves for realistic acoustic or piano playback.
 
 **Acceptance Criteria**: Open hi-hats choke naturally on closed hits, and reverse cymbals swell seamlessly into song sections.
 
