@@ -29,7 +29,7 @@ main :: () {
         case .EXPORT;
             if options.export_stems {
                 print("Exporting stems for % to %\n", options.song_path, options.output_path);
-                export_success := export_song_stems_to_wav(options.song_path, options.output_path);
+                export_success := export_song_stems_to_wav(options.song_path, options.output_path, bit_depth = options.bit_depth, apply_dither = options.enable_dither);
                 if !export_success {
                     print("Stem export failed!\n");
                     exit(1);
@@ -37,7 +37,7 @@ main :: () {
                 print("Stem export completed successfully: %\n", options.output_path);
             } else {
                 print("Exporting % to %\n", options.song_path, options.output_path);
-                export_success := export_song_to_wav(options.song_path, options.output_path);
+                export_success := export_song_to_wav(options.song_path, options.output_path, bit_depth = options.bit_depth, apply_dither = options.enable_dither);
                 if !export_success {
                     print("Export failed!\n");
                     exit(1);
@@ -114,6 +114,17 @@ parse_arguments :: (arguments: [] string) -> (Command_Line_Options, bool) {
             } else if arguments[argument_index] == "--stems" || arguments[argument_index] == "-stems" {
                 options.export_stems = true;
                 argument_index += 1;
+            } else if arguments[argument_index] == "--16bit" || arguments[argument_index] == "--16-bit" || arguments[argument_index] == "-16bit" {
+                options.bit_depth = 16;
+                argument_index += 1;
+            } else if arguments[argument_index] == "-b" && argument_index + 1 < arguments.count {
+                if arguments[argument_index + 1] == "16" {
+                    options.bit_depth = 16;
+                }
+                argument_index += 2;
+            } else if arguments[argument_index] == "--no-dither" {
+                options.enable_dither = false;
+                argument_index += 1;
             } else {
                 argument_index += 1;
             }
@@ -146,11 +157,11 @@ parse_arguments :: (arguments: [] string) -> (Command_Line_Options, bool) {
 print_usage :: () {
     print("Usage: music_engine <command> [options]\n\n");
     print("Commands:\n");
-    print("  play <file.song>                                Play a song file with hot reloading\n");
-    print("  export <file.song> [-o <out.wav>] [--stems]     Export a song file to WAV or multi-track stems\n");
-    print("  check <file.song>                               Validate a song file syntax\n");
-    print("  test-tone [seconds]                             Play a 440 Hz sine test tone through speakers\n");
-    print("  help                                            Show this help message\n");
+    print("  play <file.song>                                                     Play a song file with hot reloading\n");
+    print("  export <file.song> [-o <out.wav>] [--stems] [--16bit] [--no-dither]  Export a song file to WAV or multi-track stems\n");
+    print("  check <file.song>                                                    Validate a song file syntax\n");
+    print("  test-tone [seconds]                                                  Play a 440 Hz sine test tone through speakers\n");
+    print("  help                                                                 Show this help message\n");
 }
 
 Command_Type :: enum {
@@ -167,6 +178,8 @@ Command_Line_Options :: struct {
     song_path: string;
     output_path: string = "output.wav";
     export_stems: bool = false;
+    bit_depth: int = 32;
+    enable_dither: bool = true;
     test_tone_duration: float = 1.0;
 }
 

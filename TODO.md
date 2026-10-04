@@ -8,7 +8,7 @@
 | **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | 🟢 Completed |
 | **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | 🟢 Completed |
 | **Phase 15** | Automation & Modulation Curves | Timeline Parameter Automation (Sweeps, Risers, Fades) | 🟢 Completed |
-| **Phase 16** | Mastering & Multi-Track Stems | LUFS Loudness Metering, Stem Export, TPDF Dither | 🟡 In Progress |
+| **Phase 16** | Mastering & Multi-Track Stems | LUFS Loudness Metering, Stem Export, TPDF Dither | 🟢 Completed |
 | **Phase 17** | Professional Production Showcase | Full-length Multi-minute Songs (Synthwave, Lo-Fi, Club) | ⬜ Planned |
 
 ---
@@ -148,8 +148,8 @@
 - [x] **16.2 Multi-Track Stem Export**
   - [x] CLI command: `music_engine export <file.song> --stems -o <output_directory>/`.
   - [x] Render all mixer channels (Drums, Bass, Synths, FX, Master) into separate, synchronized WAV stems in a single pass.
-- [ ] **16.3 TPDF Audio Dithering**
-  - [ ] Triangular Probability Density Function (TPDF) noise dithering when exporting to 16-bit WAV to eliminate quantization distortion in quiet tails.
+- [x] **16.3 TPDF Audio Dithering**
+  - [x] Triangular Probability Density Function (TPDF) noise dithering when exporting to 16-bit WAV to eliminate quantization distortion in quiet tails.
 
 **Acceptance Criteria**: The engine exports broadcast-standard masters at target LUFS with zero true-peak overshoots, plus individual stems.
 

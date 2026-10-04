@@ -10,7 +10,7 @@ wav_export_tests :: () {
         samples[2] = 1.5;
         samples[3] = -1.5;
 
-        write_success := write_wav_file_16_bit(test_file_path, samples, channel_count, sample_rate);
+        write_success := write_wav_file_16_bit(test_file_path, samples, channel_count, sample_rate, apply_dither = false);
         expect_true(write_success);
 
         file_content, read_success := read_entire_file(test_file_path);
@@ -245,5 +245,102 @@ wav_export_tests :: () {
 
         expect_near(interleaved_buffer[0], 0.1);
         expect_near(interleaved_buffer[1], 0.9);
+    });
+
+    test("triangular_dither_distribution_and_properties", () {
+        random_state: u32 = 0x98765432;
+        iteration_count := 50000;
+        sum: float64 = 0.0;
+        sum_of_squares: float64 = 0.0;
+
+        iteration_index := 0;
+        while iteration_index < iteration_count {
+            dither_value := generate_triangular_dither_sample(*random_state);
+            expect_true(dither_value >= -1.0 && dither_value <= 1.0);
+
+            sum += cast(float64) dither_value;
+            sum_of_squares += cast(float64) (dither_value * dither_value);
+            iteration_index += 1;
+        }
+
+        mean := cast(float) (sum / cast(float64) iteration_count);
+        variance := cast(float) (sum_of_squares / cast(float64) iteration_count - cast(float64) (mean * mean));
+
+        expect_near(mean, 0.0, 0.02);
+        expect_near(variance, 0.166667, 0.02);
+    });
+
+    test("quantize_float_to_16_bit_dithered_preserves_sub_lsb_signal", () {
+        sub_lsb_float_value := 0.35 / 32767.0;
+
+        without_dither := quantize_float_to_16_bit(sub_lsb_float_value, null, apply_dither = false);
+        expect_equals(without_dither, 0);
+
+        random_state: u32 = 0x55aa33cc;
+        iteration_count := 30000;
+        sum: float64 = 0.0;
+
+        iteration_index := 0;
+        while iteration_index < iteration_count {
+            quantized := quantize_float_to_16_bit(sub_lsb_float_value, *random_state, apply_dither = true);
+            sum += cast(float64) quantized;
+            iteration_index += 1;
+        }
+
+        mean_quantized := cast(float) (sum / cast(float64) iteration_count);
+        expect_near(mean_quantized, 0.35, 0.03);
+    });
+
+    test("export_song_to_wav_16_bit_dithered", () {
+        test_file_path := "test_song_export_16_bit.wav";
+        export_success := export_song_to_wav("songs/drums.song", test_file_path, 44100, bit_depth = 16, apply_dither = true);
+        expect_true(export_success);
+
+        file_content, read_success := read_entire_file(test_file_path);
+        expect_true(read_success);
+        defer free(file_content);
+
+        header := cast(*Wav_Header) file_content.data;
+        expect_equals(header.audio_format, 1);
+        expect_equals(header.channel_count, 2);
+        expect_equals(header.sample_rate, 44100);
+        expect_equals(header.bits_per_sample, 16);
+
+        file_delete(test_file_path);
+    });
+
+    test("export_song_stems_to_wav_16_bit_dithered", () {
+        temporary_directory := "temporary_stem_export_16_bit_test";
+        export_success := export_song_stems_to_wav("songs/drums.song", temporary_directory, 44100, bit_depth = 16, apply_dither = true);
+        expect_true(export_success);
+
+        master_stem_path := sprint("%/master.wav", temporary_directory);
+        defer free(master_stem_path);
+        drums_stem_path := sprint("%/drums.wav", temporary_directory);
+        defer free(drums_stem_path);
+
+        master_content, read_master_success := read_entire_file(master_stem_path);
+        expect_true(read_master_success);
+        defer free(master_content);
+
+        master_header := cast(*Wav_Header) master_content.data;
+        expect_equals(master_header.audio_format, 1);
+        expect_equals(master_header.channel_count, 2);
+        expect_equals(master_header.sample_rate, 44100);
+        expect_equals(master_header.bits_per_sample, 16);
+
+        drums_content, read_drums_success := read_entire_file(drums_stem_path);
+        expect_true(read_drums_success);
+        defer free(drums_content);
+
+        drums_header := cast(*Wav_Header) drums_content.data;
+        expect_equals(drums_header.audio_format, 1);
+        expect_equals(drums_header.channel_count, 2);
+        expect_equals(drums_header.sample_rate, 44100);
+        expect_equals(drums_header.bits_per_sample, 16);
+
+        file_delete(master_stem_path);
+        file_delete(drums_stem_path);
+        delete_directory(temporary_directory);
     });
 }

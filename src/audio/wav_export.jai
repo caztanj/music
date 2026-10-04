@@ -1,4 +1,46 @@
-write_wav_file_16_bit :: (file_path: string, samples: [] float, channel_count: int = 2, sample_rate: int = DEFAULT_SAMPLE_RATE) -> bool {
+generate_triangular_dither_sample :: (random_state: *u32) -> float {
+    random_state.* = random_state.* * 1664525 + 1013904223;
+    random_one := cast(float) (cast(float64) (random_state.* & 0x7FFFFFFF) / 2147483647.0);
+
+    random_state.* = random_state.* * 1664525 + 1013904223;
+    random_two := cast(float) (cast(float64) (random_state.* & 0x7FFFFFFF) / 2147483647.0);
+
+    dither_sample := random_one - random_two;
+
+    return dither_sample;
+}
+
+quantize_float_to_16_bit :: (sample_value: float, random_state: *u32 = null, apply_dither: bool = true) -> s16 {
+    scaled_sample := sample_value * 32767.0;
+
+    if apply_dither && random_state != null {
+        dither_sample := generate_triangular_dither_sample(random_state);
+        scaled_sample += dither_sample;
+
+        rounded_integer := cast(s64) floor(scaled_sample + 0.5);
+        if rounded_integer > 32767 {
+            rounded_integer = 32767;
+        } else if rounded_integer < -32768 {
+            rounded_integer = -32768;
+        }
+
+        quantized_sample := cast(s16) rounded_integer;
+
+        return quantized_sample;
+    }
+
+    if scaled_sample > 32767.0 {
+        scaled_sample = 32767.0;
+    } else if scaled_sample < -32768.0 {
+        scaled_sample = -32768.0;
+    }
+
+    truncated_sample := cast(s16) scaled_sample;
+
+    return truncated_sample;
+}
+
+write_wav_file_16_bit :: (file_path: string, samples: [] float, channel_count: int = 2, sample_rate: int = DEFAULT_SAMPLE_RATE, apply_dither: bool = true, initial_dither_seed: u32 = 0x12345678) -> bool {
     data_size := cast(u32) (samples.count * 2);
     total_file_size := size_of(Wav_Header) + data_size;
 
@@ -34,6 +76,7 @@ write_wav_file_16_bit :: (file_path: string, samples: [] float, channel_count: i
     header.data_size = data_size;
 
     output_samples := cast(*s16) (buffer + size_of(Wav_Header));
+    random_state := initial_dither_seed;
     sample_index := 0;
 
     while sample_index < samples.count {
@@ -45,7 +88,7 @@ write_wav_file_16_bit :: (file_path: string, samples: [] float, channel_count: i
             sample_value = -1.0;
         }
 
-        output_samples[sample_index] = cast(s16) (sample_value * 32767.0);
+        output_samples[sample_index] = quantize_float_to_16_bit(sample_value, *random_state, apply_dither);
         sample_index += 1;
     }
 
@@ -254,32 +297,32 @@ generate_sample_kit :: (output_directory: string = "samples", sample_rate: int =
     defer free(kick_path);
     kick_samples := generate_kick_sample(sample_rate);
     defer free(kick_samples.data);
-    write_kick_success := write_wav_file_16_bit(kick_path, kick_samples, 2, sample_rate);
+    write_kick_success := write_wav_file_16_bit(kick_path, kick_samples, 2, sample_rate, apply_dither = false);
 
     snare_path := sprint("%/snare.wav", output_directory);
     defer free(snare_path);
     snare_samples := generate_snare_sample(sample_rate);
     defer free(snare_samples.data);
-    write_snare_success := write_wav_file_16_bit(snare_path, snare_samples, 2, sample_rate);
+    write_snare_success := write_wav_file_16_bit(snare_path, snare_samples, 2, sample_rate, apply_dither = false);
 
     hihat_path := sprint("%/hihat.wav", output_directory);
     defer free(hihat_path);
     hihat_samples := generate_hihat_sample(sample_rate);
     defer free(hihat_samples.data);
-    write_hihat_success := write_wav_file_16_bit(hihat_path, hihat_samples, 2, sample_rate);
+    write_hihat_success := write_wav_file_16_bit(hihat_path, hihat_samples, 2, sample_rate, apply_dither = false);
 
     clap_path := sprint("%/clap.wav", output_directory);
     defer free(clap_path);
     clap_samples := generate_clap_sample(sample_rate);
     defer free(clap_samples.data);
-    write_clap_success := write_wav_file_16_bit(clap_path, clap_samples, 2, sample_rate);
+    write_clap_success := write_wav_file_16_bit(clap_path, clap_samples, 2, sample_rate, apply_dither = false);
 
     all_succeeded := write_kick_success && write_snare_success && write_hihat_success && write_clap_success;
 
     return all_succeeded;
 }
 
-export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE) -> bool {
+export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE, bit_depth: int = 32, apply_dither: bool = true) -> bool {
     song_specification, parse_success, error_message := parse_song_from_file(song_path, check_samples_on_disk = true);
     if !parse_success {
         print("Export error: %\n", error_message);
@@ -328,7 +371,12 @@ export_song_to_wav :: (song_path: string, output_wav_path: string, sample_rate: 
         rendered_frames += frames_to_render;
     }
 
-    write_success := write_wav_file_32_bit_float(output_wav_path, output_samples, 2, sample_rate);
+    write_success: bool = false;
+    if bit_depth == 16 {
+        write_success = write_wav_file_16_bit(output_wav_path, output_samples, 2, sample_rate, apply_dither);
+    } else {
+        write_success = write_wav_file_32_bit_float(output_wav_path, output_samples, 2, sample_rate);
+    }
 
     return write_success;
 }
@@ -525,7 +573,7 @@ collect_song_stem_descriptors :: (song_specification: *Song_Specification) -> [.
     return descriptors;
 }
 
-export_song_stems_to_wav :: (song_path: string, output_directory_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE) -> bool {
+export_song_stems_to_wav :: (song_path: string, output_directory_path: string, sample_rate: int = DEFAULT_SAMPLE_RATE, bit_depth: int = 32, apply_dither: bool = true) -> bool {
     song_specification, parse_success, error_message := parse_song_from_file(song_path, check_samples_on_disk = true);
     if !parse_success {
         print("Export error: %\n", error_message);
@@ -649,7 +697,12 @@ export_song_stems_to_wav :: (song_path: string, output_directory_path: string, s
         destination_path := sprint("%/%", clean_directory, descriptor.filename);
         defer free(destination_path);
 
-        write_success := write_wav_file_32_bit_float(destination_path, stem_buffers[stem_index], 2, sample_rate);
+        write_success: bool = false;
+        if bit_depth == 16 {
+            write_success = write_wav_file_16_bit(destination_path, stem_buffers[stem_index], 2, sample_rate, apply_dither);
+        } else {
+            write_success = write_wav_file_32_bit_float(destination_path, stem_buffers[stem_index], 2, sample_rate);
+        }
         if !write_success {
             all_written_successfully = false;
         }
