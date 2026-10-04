@@ -89,9 +89,9 @@
 - [x] **13.2 Portamento / Monophonic Glide**
   - [x] Smooth exponential pitch glide between overlapping notes in monophonic synth modes.
   - [x] Configurable glide time in milliseconds or tempo-synced beats (ideal for 808 bass glides and lead melodies).
-- [ ] **13.3 Triplets & Micro-timing Subdivisions**
-  - [ ] Support for 8th, 16th, and 32nd note triplets in step grids and piano rolls (e.g. `t1`, `t2`, `t3`).
-  - [ ] Micro-step tick offsets for humanized timing and strumming emulation.
+- [x] **13.3 Triplets & Micro-timing Subdivisions**
+  - [x] Support for 8th, 16th, and 32nd note triplets in step grids and piano rolls (e.g. `t1`, `t2`, `t3`).
+  - [x] Micro-step tick offsets for humanized timing and strumming emulation.
 - [ ] **13.4 Velocity Mapping & Dynamics**
   - [ ] Note velocity dynamically scaling synth filter envelope depth, resonance, and amplifier gain.
   - [ ] Ghost notes and accent markers in pattern definitions.

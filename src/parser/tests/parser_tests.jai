@@ -274,5 +274,71 @@ END;
         expect_near(melody_pattern.swing, 0.70, 0.001);
         expect_near(get_pattern_effective_swing(*song_specification, melody_pattern), 0.70, 0.001);
     });
+
+    test("pattern triplet grid and micro timing subdivisions", () {
+        song_text := #string END
+[project]
+name = "Triplet Track"
+bpm = 140
+
+[instruments]
+hat = synth(wave="sine")
+lead = synth(wave="saw")
+
+[pattern triplet_hats grid=8t]
+hat | t1 t2 t3 t1 t2 t3 t1 t2 t3 t1 t2 t3 |
+
+[pattern rolls]
+hat | [t1 t2 t3] . [x x x x] . |
+
+[pattern guitar_strum]
+E2 step=0 tick=0 len=2
+B2 step=0 tick=12 len=2
+E3 step=0 tick=24 len=2
+G3 step=t2 len=16t
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+hat -> track 1
+lead -> track 1
+
+[arrangement]
+bar 1: triplet_hats
+bar 2: rolls
+bar 3: guitar_strum
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "test.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        triplet_pattern, triplet_found := find_pattern(*song_specification, "triplet_hats");
+        expect_true(triplet_found);
+        expect_equals(cast(s64) triplet_pattern.subdivision, cast(s64) Pattern_Subdivision.TRIPLET_8TH);
+        expect_equals(triplet_pattern.step_count, 12);
+
+        rolls_pattern, rolls_found := find_pattern(*song_specification, "rolls");
+        expect_true(rolls_found);
+        expect_true(rolls_pattern.step_tracks.count > 0);
+        track := *rolls_pattern.step_tracks[0];
+        expect_true(track.step_events.count >= 7);
+        expect_equals(track.step_events[0].step_index, 0);
+        expect_equals(track.step_events[0].tick_offset, 0);
+        expect_equals(track.step_events[1].step_index, 0);
+        expect_equals(track.step_events[1].tick_offset, 8);
+        expect_equals(track.step_events[2].step_index, 0);
+        expect_equals(track.step_events[2].tick_offset, 16);
+
+        strum_pattern, strum_found := find_pattern(*song_specification, "guitar_strum");
+        expect_true(strum_found);
+        expect_equals(strum_pattern.piano_roll_notes.count, 4);
+        expect_equals(strum_pattern.piano_roll_notes[0].tick_offset, 0);
+        expect_equals(strum_pattern.piano_roll_notes[1].tick_offset, 12);
+        expect_equals(strum_pattern.piano_roll_notes[2].tick_offset, 24);
+        expect_equals(strum_pattern.piano_roll_notes[3].tick_offset, 16);
+        expect_equals(strum_pattern.piano_roll_notes[3].length_ticks, 16);
+    });
 }
 

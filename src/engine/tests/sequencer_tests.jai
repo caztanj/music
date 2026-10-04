@@ -446,5 +446,198 @@ sequencer_tests :: () {
 
         expect_true(sequencer.events[0].sample_offset_in_block < sequencer.events[1].sample_offset_in_block);
     });
+
+    test("step and tick sample calculation accuracy", () {
+        samples_per_step := calculate_samples_per_step(44100, 120.0);
+        samples_per_tick := samples_per_step / cast(float64) TICKS_PER_STEP;
+
+        pos_0 := calculate_step_and_tick_sample_position(0, 0, samples_per_step);
+        expect_equals(cast(s64) pos_0, 0);
+
+        pos_32t2 := calculate_step_and_tick_sample_position(0, 8, samples_per_step);
+        expected_32t2 := cast(s64) (samples_per_step / 3.0 + 0.5);
+        expect_equals(cast(s64) pos_32t2, expected_32t2);
+
+        pos_32t3 := calculate_step_and_tick_sample_position(0, 16, samples_per_step);
+        expected_32t3 := cast(s64) (2.0 * samples_per_step / 3.0 + 0.5);
+        expect_equals(cast(s64) pos_32t3, expected_32t3);
+
+        pos_16t2 := calculate_step_and_tick_sample_position(0, 16, samples_per_step);
+        pos_16t3 := calculate_step_and_tick_sample_position(0, 32, samples_per_step);
+        expect_equals(cast(s64) pos_16t3, cast(s64) (4.0 * samples_per_step / 3.0 + 0.5));
+
+        strum_offset_1 := calculate_step_and_tick_sample_position(2, 10, samples_per_step);
+        expected_strum := cast(s64) (2.0 * samples_per_step + 10.0 * samples_per_tick + 0.5);
+        expect_equals(cast(s64) strum_offset_1, expected_strum);
+    });
+
+    test("sequencer schedules bracket roll events with micro timing", () {
+        specification: Song_Specification;
+        specification.project.beats_per_minute = 120.0;
+        specification.project.total_bars = 1;
+
+        instrument: Instrument_Definition;
+        instrument.name = "snare";
+        instrument.type = .SYNTHESIZER;
+        array_add(*specification.instruments, instrument);
+
+        routing: Routing_Definition;
+        routing.instrument_name = "snare";
+        routing.track_index = 1;
+        array_add(*specification.routings, routing);
+
+        pattern: Pattern_Definition;
+        pattern.name = "snare_roll";
+
+        step_track: Step_Sequencer_Track;
+        step_track.instrument_name = "snare";
+        array_add(*step_track.step_events, Step_Event.{step_index = 0, tick_offset = 0, velocity = 0.9});
+        array_add(*step_track.step_events, Step_Event.{step_index = 0, tick_offset = 8, velocity = 0.85});
+        array_add(*step_track.step_events, Step_Event.{step_index = 0, tick_offset = 16, velocity = 0.95});
+        array_add(*pattern.step_tracks, step_track);
+        array_add(*specification.patterns, pattern);
+
+        clip: Arrangement_Clip;
+        clip.pattern_name = "snare_roll";
+        clip.start_bar = 1;
+        clip.end_bar = 1;
+        array_add(*specification.arrangement.clips, clip);
+
+        sequencer := New(Sequencer);
+        defer free(sequencer);
+        configure_sequencer_from_song(sequencer, *specification, sample_rate = 44100);
+
+        samples_per_step_float := calculate_samples_per_step(44100, 120.0);
+        samples_per_tick := samples_per_step_float / cast(float64) TICKS_PER_STEP;
+
+        collect_sequencer_events_for_block(sequencer, *specification, cast(s64) samples_per_step_float);
+        expect_equals(sequencer.event_count, 3);
+
+        expect_equals(sequencer.events[0].sample_offset_in_block, 0);
+        expect_equals(sequencer.events[1].sample_offset_in_block, cast(s64) (8.0 * samples_per_tick + 0.5));
+        expect_equals(sequencer.events[2].sample_offset_in_block, cast(s64) (16.0 * samples_per_tick + 0.5));
+    });
+
+    test("piano roll strum tick offsets scheduling", () {
+        specification: Song_Specification;
+        specification.project.beats_per_minute = 120.0;
+        specification.project.total_bars = 1;
+
+        instrument: Instrument_Definition;
+        instrument.name = "guitar";
+        instrument.type = .SYNTHESIZER;
+        array_add(*specification.instruments, instrument);
+
+        routing: Routing_Definition;
+        routing.instrument_name = "guitar";
+        routing.track_index = 1;
+        array_add(*specification.routings, routing);
+
+        pattern: Pattern_Definition;
+        pattern.name = "strum_pattern";
+
+        note_1: Piano_Roll_Note;
+        note_1.midi_note_number = 40;
+        note_1.start_step = 0;
+        note_1.tick_offset = 0;
+        note_1.step_length = 2;
+        array_add(*pattern.piano_roll_notes, note_1);
+
+        note_2: Piano_Roll_Note;
+        note_2.midi_note_number = 47;
+        note_2.start_step = 0;
+        note_2.tick_offset = 10;
+        note_2.step_length = 2;
+        array_add(*pattern.piano_roll_notes, note_2);
+
+        note_3: Piano_Roll_Note;
+        note_3.midi_note_number = 52;
+        note_3.start_step = 0;
+        note_3.tick_offset = 20;
+        note_3.step_length = 2;
+        array_add(*pattern.piano_roll_notes, note_3);
+
+        array_add(*specification.patterns, pattern);
+
+        clip: Arrangement_Clip;
+        clip.pattern_name = "strum_pattern";
+        clip.start_bar = 1;
+        clip.end_bar = 1;
+        array_add(*specification.arrangement.clips, clip);
+
+        sequencer := New(Sequencer);
+        defer free(sequencer);
+        configure_sequencer_from_song(sequencer, *specification, sample_rate = 44100);
+
+        samples_per_step_float := calculate_samples_per_step(44100, 120.0);
+        samples_per_tick := samples_per_step_float / cast(float64) TICKS_PER_STEP;
+
+        collect_sequencer_events_for_block(sequencer, *specification, cast(s64) samples_per_step_float);
+        expect_equals(sequencer.event_count, 3);
+
+        expect_equals(sequencer.events[0].midi_note_number, 40);
+        expect_equals(sequencer.events[0].sample_offset_in_block, 0);
+
+        expect_equals(sequencer.events[1].midi_note_number, 47);
+        expect_equals(sequencer.events[1].sample_offset_in_block, cast(s64) (10.0 * samples_per_tick + 0.5));
+
+        expect_equals(sequencer.events[2].midi_note_number, 52);
+        expect_equals(sequencer.events[2].sample_offset_in_block, cast(s64) (20.0 * samples_per_tick + 0.5));
+    });
+
+    test("triplet grid pattern timing", () {
+        specification: Song_Specification;
+        specification.project.beats_per_minute = 120.0;
+        specification.project.total_bars = 1;
+
+        instrument: Instrument_Definition;
+        instrument.name = "hat";
+        instrument.type = .SYNTHESIZER;
+        array_add(*specification.instruments, instrument);
+
+        routing: Routing_Definition;
+        routing.instrument_name = "hat";
+        routing.track_index = 1;
+        array_add(*specification.routings, routing);
+
+        pattern: Pattern_Definition;
+        pattern.name = "triplet_hats";
+        pattern.subdivision = .TRIPLET_8TH;
+        pattern.step_count = 12;
+
+        step_track: Step_Sequencer_Track;
+        step_track.instrument_name = "hat";
+        step_index := 0;
+        while step_index < 12 {
+            array_add(*step_track.steps, true);
+            array_add(*step_track.velocities, 0.8);
+            step_index += 1;
+        }
+        array_add(*pattern.step_tracks, step_track);
+        array_add(*specification.patterns, pattern);
+
+        clip: Arrangement_Clip;
+        clip.pattern_name = "triplet_hats";
+        clip.start_bar = 1;
+        clip.end_bar = 1;
+        array_add(*specification.arrangement.clips, clip);
+
+        sequencer := New(Sequencer);
+        defer free(sequencer);
+        configure_sequencer_from_song(sequencer, *specification, sample_rate = 44100);
+
+        samples_per_beat := calculate_samples_per_beat(44100, 120.0);
+        samples_per_triplet_step := samples_per_beat / 3.0;
+
+        collect_sequencer_events_for_block(sequencer, *specification, cast(s64) (samples_per_beat * 4.0));
+        expect_equals(sequencer.event_count, 12);
+
+        i := 0;
+        while i < 12 {
+            expected_sample := cast(s64) (cast(float64) i * samples_per_triplet_step + 0.5);
+            expect_near(cast(float) sequencer.events[i].sample_offset_in_block, cast(float) expected_sample, 1.0);
+            i += 1;
+        }
+    });
 }
 

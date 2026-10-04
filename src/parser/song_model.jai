@@ -295,6 +295,69 @@ get_pattern_effective_swing :: (song_specification: *Song_Specification, pattern
     return 0.5;
 }
 
+string_to_pattern_subdivision :: (name: string) -> Pattern_Subdivision, bool {
+    if name == "standard" || name == "16th" || name == "16" || name == "1/16" {
+        return .STANDARD_16TH, true;
+    }
+
+    if name == "triplet_8th" || name == "8t" || name == "8th_triplet" || name == "1/8t" || name == "12" {
+        return .TRIPLET_8TH, true;
+    }
+
+    if name == "triplet_16th" || name == "16t" || name == "16th_triplet" || name == "1/16t" || name == "24" {
+        return .TRIPLET_16TH, true;
+    }
+
+    if name == "triplet_32nd" || name == "32t" || name == "32nd_triplet" || name == "1/32t" || name == "48" {
+        return .TRIPLET_32ND, true;
+    }
+
+    return .STANDARD_16TH, false;
+}
+
+pattern_subdivision_to_string :: (subdivision: Pattern_Subdivision) -> string {
+    if subdivision == {
+        case .STANDARD_16TH;
+            return "16th";
+
+        case .TRIPLET_8TH;
+            return "8t";
+
+        case .TRIPLET_16TH;
+            return "16t";
+
+        case .TRIPLET_32ND;
+            return "32t";
+
+        case;
+            return "unknown";
+    }
+}
+
+is_triplet_subdivision :: (subdivision: Pattern_Subdivision) -> bool {
+    return subdivision == .TRIPLET_8TH || subdivision == .TRIPLET_16TH || subdivision == .TRIPLET_32ND;
+}
+
+get_subdivision_step_count :: (subdivision: Pattern_Subdivision) -> s64 {
+    if subdivision == {
+        case .TRIPLET_8TH;
+            return 12;
+
+        case .TRIPLET_16TH;
+            return 24;
+
+        case .TRIPLET_32ND;
+            return 48;
+
+        case .STANDARD_16TH;
+            return STEPS_PER_BAR;
+
+        case;
+            return STEPS_PER_BAR;
+    }
+}
+
+
 Waveform_Type :: enum {
 
     SAWTOOTH;
@@ -423,10 +486,30 @@ Instrument_Definition :: struct {
     location: Source_Location;
 }
 
+Pattern_Subdivision :: enum {
+    STANDARD_16TH;
+    TRIPLET_8TH;
+    TRIPLET_16TH;
+    TRIPLET_32ND;
+}
+
+Step_Event :: struct {
+    step_index: s64 = 0;
+    tick_offset: s64 = 0;
+    velocity: float = 1.0;
+}
+
+Sub_Step_Item :: struct {
+    is_hit: bool = false;
+    velocity: float = 1.0;
+}
+
 Piano_Roll_Note :: struct {
     midi_note_number: s32 = 60;
     start_step: s64 = 0;
     step_length: s64 = 1;
+    tick_offset: s64 = 0;
+    length_ticks: s64 = 0;
     velocity: float = 1.0;
     location: Source_Location;
 }
@@ -435,6 +518,7 @@ Step_Sequencer_Track :: struct {
     instrument_name: string;
     steps: [..] bool;
     velocities: [..] float;
+    step_events: [..] Step_Event;
     location: Source_Location;
 }
 
@@ -443,6 +527,7 @@ Pattern_Definition :: struct {
     step_tracks: [..] Step_Sequencer_Track;
     piano_roll_notes: [..] Piano_Roll_Note;
     step_count: s64 = STEPS_PER_BAR;
+    subdivision: Pattern_Subdivision = .STANDARD_16TH;
     swing: float = -1.0;
     location: Source_Location;
 }

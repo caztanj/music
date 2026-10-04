@@ -87,29 +87,81 @@ parse_entire_song :: (parser: *Parser, song_specification: *Song_Specification) 
             advance_token(parser);
 
             initial_swing: float = -1.0;
-            if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "swing" || current_token(parser).text == "shuffle") {
-                advance_token(parser);
-                equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after swing parameter in pattern header");
-                if !equals_success return false;
+            initial_subdivision := Pattern_Subdivision.STANDARD_16TH;
 
-                number_value, number_success := parse_number(parser);
-                if !number_success return false;
-
-                if current_token(parser).type == .PERCENT {
+            while current_token(parser).type == .IDENTIFIER {
+                param_name := current_token(parser).text;
+                if param_name == "swing" || param_name == "shuffle" {
                     advance_token(parser);
-                }
+                    equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after swing parameter in pattern header");
+                    if !equals_success return false;
 
-                swing_value := cast(float) number_value;
-                if swing_value > 1.0 {
-                    swing_value /= 100.0;
+                    number_value, number_success := parse_number(parser);
+                    if !number_success return false;
+
+                    if current_token(parser).type == .PERCENT {
+                        advance_token(parser);
+                    }
+
+                    swing_value := cast(float) number_value;
+                    if swing_value > 1.0 {
+                        swing_value /= 100.0;
+                    }
+                    initial_swing = clamp_swing_value(swing_value);
+                } else if param_name == "grid" || param_name == "subdivision" || param_name == "triplets" || param_name == "triplet" {
+                    advance_token(parser);
+                    equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after grid parameter in pattern header");
+                    if !equals_success return false;
+
+                    val_token := current_token(parser);
+                    if val_token.type == .IDENTIFIER || val_token.type == .STRING {
+                        name_str := ifx val_token.type == .STRING then val_token.string_value else val_token.text;
+                        parsed_sub, parse_ok := string_to_pattern_subdivision(name_str);
+                        if parse_ok {
+                            initial_subdivision = parsed_sub;
+                            advance_token(parser);
+                        } else {
+                            set_error(parser, val_token.location, sprint("Invalid pattern subdivision '%'", name_str));
+                            return false;
+                        }
+                    } else if val_token.type == .INTEGER {
+                        next_tok := peek_token(parser, 1);
+                        if (val_token.integer_value == 8 || val_token.integer_value == 16 || val_token.integer_value == 32) && next_tok.type == .IDENTIFIER && (next_tok.text == "t" || next_tok.text == "T") {
+                            advance_token(parser);
+                            advance_token(parser);
+                            if val_token.integer_value == 8 {
+                                initial_subdivision = .TRIPLET_8TH;
+                            } else if val_token.integer_value == 16 {
+                                initial_subdivision = .TRIPLET_16TH;
+                            } else if val_token.integer_value == 32 {
+                                initial_subdivision = .TRIPLET_32ND;
+                            }
+                        } else if val_token.integer_value == 12 {
+                            initial_subdivision = .TRIPLET_8TH;
+                            advance_token(parser);
+                        } else if val_token.integer_value == 24 {
+                            initial_subdivision = .TRIPLET_16TH;
+                            advance_token(parser);
+                        } else if val_token.integer_value == 48 {
+                            initial_subdivision = .TRIPLET_32ND;
+                            advance_token(parser);
+                        } else if val_token.integer_value == 16 {
+                            initial_subdivision = .STANDARD_16TH;
+                            advance_token(parser);
+                        } else {
+                            set_error(parser, val_token.location, sprint("Invalid pattern step count '%'", val_token.integer_value));
+                            return false;
+                        }
+                    }
+                } else {
+                    break;
                 }
-                initial_swing = clamp_swing_value(swing_value);
             }
 
-            close_token, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' after pattern name");
+            close_token, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' after pattern name and options");
             if !close_success return false;
 
-            success := parse_pattern_section(parser, pattern_name, pattern_name_token.location, song_specification, initial_swing);
+            success := parse_pattern_section(parser, pattern_name, pattern_name_token.location, song_specification, initial_swing, initial_subdivision);
             if !success return false;
 
         } else if section_name == "mixer" {
@@ -684,11 +736,13 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
     return true;
 }
 
-parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Source_Location, song_specification: *Song_Specification, initial_swing: float = -1.0) -> bool {
+parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Source_Location, song_specification: *Song_Specification, initial_swing: float = -1.0, initial_subdivision: Pattern_Subdivision = .STANDARD_16TH) -> bool {
     pattern: Pattern_Definition;
     pattern.name = pattern_name;
     pattern.location = location;
     pattern.swing = initial_swing;
+    pattern.subdivision = initial_subdivision;
+    pattern.step_count = get_subdivision_step_count(initial_subdivision);
 
     while !parser.has_error && parser.current_token_index < parser.tokens.count {
         skip_newlines(parser);
@@ -723,6 +777,61 @@ parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Sourc
             continue;
         }
 
+        if (token.text == "grid" || token.text == "subdivision" || token.text == "triplets" || token.text == "triplet") && next_token_peek.type == .EQUALS {
+            advance_token(parser);
+            advance_token(parser);
+
+            value_token := current_token(parser);
+            if value_token.type == .IDENTIFIER || value_token.type == .STRING {
+                subdivision_name := ifx value_token.type == .STRING then value_token.string_value else value_token.text;
+                parsed_subdivision, parse_success := string_to_pattern_subdivision(subdivision_name);
+                if parse_success {
+                    pattern.subdivision = parsed_subdivision;
+                    pattern.step_count = get_subdivision_step_count(parsed_subdivision);
+                    advance_token(parser);
+                    continue;
+                }
+            } else if value_token.type == .INTEGER {
+                next_tok := peek_token(parser, 1);
+                if (value_token.integer_value == 8 || value_token.integer_value == 16 || value_token.integer_value == 32) && next_tok.type == .IDENTIFIER && (next_tok.text == "t" || next_tok.text == "T") {
+                    advance_token(parser);
+                    advance_token(parser);
+                    if value_token.integer_value == 8 {
+                        pattern.subdivision = .TRIPLET_8TH;
+                    } else if value_token.integer_value == 16 {
+                        pattern.subdivision = .TRIPLET_16TH;
+                    } else if value_token.integer_value == 32 {
+                        pattern.subdivision = .TRIPLET_32ND;
+                    }
+                    pattern.step_count = get_subdivision_step_count(pattern.subdivision);
+                    continue;
+                } else if value_token.integer_value == 12 {
+                    pattern.subdivision = .TRIPLET_8TH;
+                    pattern.step_count = 12;
+                    advance_token(parser);
+                    continue;
+                } else if value_token.integer_value == 24 {
+                    pattern.subdivision = .TRIPLET_16TH;
+                    pattern.step_count = 24;
+                    advance_token(parser);
+                    continue;
+                } else if value_token.integer_value == 48 {
+                    pattern.subdivision = .TRIPLET_32ND;
+                    pattern.step_count = 48;
+                    advance_token(parser);
+                    continue;
+                } else if value_token.integer_value == 16 {
+                    pattern.subdivision = .STANDARD_16TH;
+                    pattern.step_count = 16;
+                    advance_token(parser);
+                    continue;
+                }
+            }
+
+            set_error(parser, value_token.location, sprint("Invalid pattern subdivision '%'", value_token.text));
+            return false;
+        }
+
         if next_token_peek.type == .PIPE {
             success := parse_step_sequencer_row(parser, *pattern);
             if !success return false;
@@ -750,6 +859,8 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
     track.instrument_name = instrument_name;
     track.location = instrument_token.location;
 
+    current_step: s64 = 0;
+
     while !parser.has_error && parser.current_token_index < parser.tokens.count {
         step_token := current_token(parser);
 
@@ -764,26 +875,187 @@ parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> b
         }
 
         if step_token.type == .STEP_HIT {
-            array_add(*track.steps, true);
-            array_add(*track.velocities, 1.0);
+            velocity_value: float = 1.0;
             advance_token(parser);
+            if current_token(parser).type == .COLON {
+                advance_token(parser);
+                number_value, number_success := parse_number(parser);
+                if !number_success return false;
+                velocity_value = ifx number_value > 1.0 then cast(float) (number_value / 10.0) else cast(float) number_value;
+            }
+            array_add(*track.steps, true);
+            array_add(*track.velocities, velocity_value);
+            array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = 0, velocity = velocity_value});
+            current_step += 1;
         } else if step_token.type == .DOT {
             array_add(*track.steps, false);
             array_add(*track.velocities, 0.0);
             advance_token(parser);
+            current_step += 1;
         } else if step_token.type == .INTEGER {
-            velocity_value := cast(float) step_token.integer_value / 10.0;
-            if velocity_value > 1.0 velocity_value = 1.0;
-            array_add(*track.steps, true);
-            array_add(*track.velocities, velocity_value);
+            triplet_kind := step_token.integer_value;
+            next_token := peek_token(parser, 1);
+            if (triplet_kind == 8 || triplet_kind == 16 || triplet_kind == 32) && next_token.type == .IDENTIFIER && (next_token.text == "t1" || next_token.text == "t2" || next_token.text == "t3") {
+                advance_token(parser);
+                id_token := current_token(parser);
+                advance_token(parser);
+
+                tick_offset: s64 = 0;
+                if triplet_kind == 8 {
+                    if id_token.text == "t1" tick_offset = 0;
+                    else if id_token.text == "t2" tick_offset = 32;
+                    else if id_token.text == "t3" tick_offset = 64;
+                } else if triplet_kind == 16 {
+                    if id_token.text == "t1" tick_offset = 0;
+                    else if id_token.text == "t2" tick_offset = 16;
+                    else if id_token.text == "t3" tick_offset = 32;
+                } else if triplet_kind == 32 {
+                    if id_token.text == "t1" tick_offset = 0;
+                    else if id_token.text == "t2" tick_offset = 8;
+                    else if id_token.text == "t3" tick_offset = 16;
+                }
+
+                array_add(*track.steps, true);
+                array_add(*track.velocities, 1.0);
+                array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = tick_offset, velocity = 1.0});
+                current_step += 1;
+            } else {
+                velocity_value := cast(float) step_token.integer_value / 10.0;
+                if velocity_value > 1.0 velocity_value = 1.0;
+                array_add(*track.steps, true);
+                array_add(*track.velocities, velocity_value);
+                array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = 0, velocity = velocity_value});
+                advance_token(parser);
+                current_step += 1;
+            }
+        } else if step_token.type == .OPEN_BRACKET {
             advance_token(parser);
+
+            sub_items: [..] Sub_Step_Item;
+            defer array_free(sub_items);
+
+            while !parser.has_error && current_token(parser).type != .CLOSE_BRACKET && current_token(parser).type != .END_OF_FILE && current_token(parser).type != .NEWLINE {
+                item_token := current_token(parser);
+                if item_token.type == .STEP_HIT {
+                    advance_token(parser);
+                    item_velocity: float = 1.0;
+                    if current_token(parser).type == .COLON {
+                        advance_token(parser);
+                        num, num_ok := parse_number(parser);
+                        if num_ok item_velocity = ifx num > 1.0 then cast(float) (num / 10.0) else cast(float) num;
+                    }
+                    array_add(*sub_items, Sub_Step_Item.{is_hit = true, velocity = item_velocity});
+                } else if item_token.type == .DOT {
+                    advance_token(parser);
+                    array_add(*sub_items, Sub_Step_Item.{is_hit = false, velocity = 0.0});
+                } else if item_token.type == .INTEGER {
+                    advance_token(parser);
+                    item_velocity := cast(float) item_token.integer_value / 10.0;
+                    if item_velocity > 1.0 item_velocity = 1.0;
+                    array_add(*sub_items, Sub_Step_Item.{is_hit = true, velocity = item_velocity});
+                } else if item_token.type == .IDENTIFIER {
+                    advance_token(parser);
+                    item_velocity: float = 1.0;
+                    if current_token(parser).type == .COLON {
+                        advance_token(parser);
+                        num, num_ok := parse_number(parser);
+                        if num_ok item_velocity = ifx num > 1.0 then cast(float) (num / 10.0) else cast(float) num;
+                    }
+                    array_add(*sub_items, Sub_Step_Item.{is_hit = true, velocity = item_velocity});
+                } else {
+                    set_error(parser, item_token.location, sprint("Invalid token in sub-step bracket '%'", item_token.text));
+                    return false;
+                }
+            }
+
+            close_bracket, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' to close sub-step roll");
+            if !close_success return false;
+
+            if sub_items.count > 0 {
+                ticks_per_sub := TICKS_PER_STEP / sub_items.count;
+                has_any_hit := false;
+                item_index := 0;
+                while item_index < sub_items.count {
+                    if sub_items[item_index].is_hit {
+                        has_any_hit = true;
+                        tick_offset := item_index * ticks_per_sub;
+                        array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = tick_offset, velocity = sub_items[item_index].velocity});
+                    }
+                    item_index += 1;
+                }
+                array_add(*track.steps, has_any_hit);
+                array_add(*track.velocities, ifx has_any_hit then 1.0 else 0.0);
+            } else {
+                array_add(*track.steps, false);
+                array_add(*track.velocities, 0.0);
+            }
+            current_step += 1;
+        } else if step_token.type == .IDENTIFIER {
+            name := step_token.text;
+            if name == "t1" || name == "t2" || name == "t3" || name == "t" || name == "T1" || name == "T2" || name == "T3" || name == "T" {
+                velocity_value: float = 1.0;
+                advance_token(parser);
+                if current_token(parser).type == .COLON {
+                    advance_token(parser);
+                    number_value, number_success := parse_number(parser);
+                    if !number_success return false;
+                    velocity_value = ifx number_value > 1.0 then cast(float) (number_value / 10.0) else cast(float) number_value;
+                }
+
+                tick_offset: s64 = 0;
+                if pattern.subdivision == .STANDARD_16TH {
+                    if name == "t2" || name == "T2" {
+                        tick_offset = 8;
+                    } else if name == "t3" || name == "T3" {
+                        tick_offset = 16;
+                    }
+                }
+
+                array_add(*track.steps, true);
+                array_add(*track.velocities, velocity_value);
+                array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = tick_offset, velocity = velocity_value});
+                current_step += 1;
+            } else if name == "8t1" || name == "8t2" || name == "8t3" || name == "16t1" || name == "16t2" || name == "16t3" || name == "32t1" || name == "32t2" || name == "32t3" {
+                tick_offset: s64 = 0;
+                if name == "8t1" tick_offset = 0;
+                else if name == "8t2" tick_offset = 32;
+                else if name == "8t3" tick_offset = 64;
+                else if name == "16t1" tick_offset = 0;
+                else if name == "16t2" tick_offset = 16;
+                else if name == "16t3" tick_offset = 32;
+                else if name == "32t1" tick_offset = 0;
+                else if name == "32t2" tick_offset = 8;
+                else if name == "32t3" tick_offset = 16;
+
+                advance_token(parser);
+                array_add(*track.steps, true);
+                array_add(*track.velocities, 1.0);
+                array_add(*track.step_events, Step_Event.{step_index = current_step, tick_offset = tick_offset, velocity = 1.0});
+                current_step += 1;
+            } else {
+                set_error(parser, step_token.location, sprint("Invalid step character '%'", step_token.text));
+                return false;
+            }
         } else {
             set_error(parser, step_token.location, sprint("Invalid step character '%'", step_token.text));
             return false;
         }
     }
 
-    if track.steps.count > pattern.step_count {
+    if pattern.subdivision == .STANDARD_16TH {
+        if track.steps.count == 12 {
+            pattern.subdivision = .TRIPLET_8TH;
+            pattern.step_count = 12;
+        } else if track.steps.count == 24 {
+            pattern.subdivision = .TRIPLET_16TH;
+            pattern.step_count = 24;
+        } else if track.steps.count == 48 {
+            pattern.subdivision = .TRIPLET_32ND;
+            pattern.step_count = 48;
+        } else if track.steps.count > pattern.step_count {
+            pattern.step_count = track.steps.count;
+        }
+    } else if track.steps.count > pattern.step_count {
         pattern.step_count = track.steps.count;
     }
 
@@ -826,13 +1098,166 @@ parse_piano_roll_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool 
         if !equals_success return false;
 
         if parameter_name == "step" || parameter_name == "start" {
-            step_token, step_success := consume_token(parser, .INTEGER, "Expected integer for note start step");
-            if !step_success return false;
-            piano_roll_note.start_step = step_token.integer_value;
+            step_token := current_token(parser);
+            if step_token.type == .INTEGER {
+                next_tok := peek_token(parser, 1);
+                if (step_token.integer_value == 8 || step_token.integer_value == 16 || step_token.integer_value == 32) && next_tok.type == .IDENTIFIER && (next_tok.text == "t1" || next_tok.text == "t2" || next_tok.text == "t3") {
+                    advance_token(parser);
+                    id_token := current_token(parser);
+                    advance_token(parser);
+                    triplet_kind := step_token.integer_value;
+                    if triplet_kind == 8 {
+                        if id_token.text == "t1" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 0; }
+                        else if id_token.text == "t2" { piano_roll_note.start_step = 1; piano_roll_note.tick_offset = 8; }
+                        else if id_token.text == "t3" { piano_roll_note.start_step = 2; piano_roll_note.tick_offset = 16; }
+                    } else if triplet_kind == 16 {
+                        if id_token.text == "t1" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 0; }
+                        else if id_token.text == "t2" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 16; }
+                        else if id_token.text == "t3" { piano_roll_note.start_step = 1; piano_roll_note.tick_offset = 8; }
+                    } else if triplet_kind == 32 {
+                        if id_token.text == "t1" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 0; }
+                        else if id_token.text == "t2" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 8; }
+                        else if id_token.text == "t3" { piano_roll_note.start_step = 0; piano_roll_note.tick_offset = 16; }
+                    }
+                } else {
+                    advance_token(parser);
+                    if current_token(parser).type == .SLASH {
+                        advance_token(parser);
+                        denom_token, denom_ok := consume_token(parser, .INTEGER, "Expected denominator in step fraction");
+                        if !denom_ok return false;
+                        step_float := (cast(float64) step_token.integer_value / cast(float64) denom_token.integer_value) * 4.0;
+                        piano_roll_note.start_step = cast(s64) step_float;
+                        fraction := step_float - cast(float64) piano_roll_note.start_step;
+                        piano_roll_note.tick_offset = cast(s64) (fraction * cast(float64) TICKS_PER_STEP + 0.5);
+                    } else {
+                        piano_roll_note.start_step = step_token.integer_value;
+                    }
+                }
+            } else if step_token.type == .FLOAT {
+                piano_roll_note.start_step = cast(s64) step_token.float_value;
+                fraction := step_token.float_value - cast(float64) piano_roll_note.start_step;
+                piano_roll_note.tick_offset = cast(s64) (fraction * cast(float64) TICKS_PER_STEP + 0.5);
+                advance_token(parser);
+            } else if step_token.type == .IDENTIFIER {
+                name := step_token.text;
+                advance_token(parser);
+                if name == "t1" || name == "8t1" || name == "16t1" || name == "32t1" {
+                    piano_roll_note.start_step = 0;
+                    piano_roll_note.tick_offset = 0;
+                } else if name == "t2" || name == "16t2" {
+                    piano_roll_note.start_step = 0;
+                    piano_roll_note.tick_offset = 16;
+                } else if name == "t3" || name == "16t3" {
+                    piano_roll_note.start_step = 1;
+                    piano_roll_note.tick_offset = 8;
+                } else if name == "8t2" {
+                    piano_roll_note.start_step = 1;
+                    piano_roll_note.tick_offset = 8;
+                } else if name == "8t3" {
+                    piano_roll_note.start_step = 2;
+                    piano_roll_note.tick_offset = 16;
+                } else if name == "32t2" {
+                    piano_roll_note.start_step = 0;
+                    piano_roll_note.tick_offset = 8;
+                } else if name == "32t3" {
+                    piano_roll_note.start_step = 0;
+                    piano_roll_note.tick_offset = 16;
+                } else {
+                    set_error(parser, step_token.location, sprint("Invalid step identifier '%'", name));
+                    return false;
+                }
+            } else {
+                set_error(parser, step_token.location, sprint("Expected number or identifier for note start step, got '%'", step_token.text));
+                return false;
+            }
+        } else if parameter_name == "tick" || parameter_name == "tick_offset" || parameter_name == "offset" {
+            is_negative := false;
+            if current_token(parser).type == .MINUS {
+                is_negative = true;
+                advance_token(parser);
+            }
+            tick_token, tick_success := consume_token(parser, .INTEGER, "Expected integer for tick offset");
+            if !tick_success return false;
+            offset_value := tick_token.integer_value;
+            if is_negative offset_value = -offset_value;
+            piano_roll_note.tick_offset += offset_value;
+        } else if parameter_name == "strum" {
+            strum_token, strum_success := consume_token(parser, .INTEGER, "Expected integer for strum offset");
+            if !strum_success return false;
+            piano_roll_note.tick_offset += strum_token.integer_value;
+        } else if parameter_name == "triplet" || parameter_name == "sub" {
+            token_sub := current_token(parser);
+            advance_token(parser);
+            if token_sub.type == .INTEGER {
+                next_tok := current_token(parser);
+                if (token_sub.integer_value == 8 || token_sub.integer_value == 16 || token_sub.integer_value == 32) && next_tok.type == .IDENTIFIER && (next_tok.text == "t1" || next_tok.text == "t2" || next_tok.text == "t3") {
+                    advance_token(parser);
+                    triplet_kind := token_sub.integer_value;
+                    if triplet_kind == 8 {
+                        if next_tok.text == "t1" piano_roll_note.tick_offset += 0;
+                        else if next_tok.text == "t2" piano_roll_note.tick_offset += 32;
+                        else if next_tok.text == "t3" piano_roll_note.tick_offset += 64;
+                    } else if triplet_kind == 16 {
+                        if next_tok.text == "t1" piano_roll_note.tick_offset += 0;
+                        else if next_tok.text == "t2" piano_roll_note.tick_offset += 16;
+                        else if next_tok.text == "t3" piano_roll_note.tick_offset += 32;
+                    } else if triplet_kind == 32 {
+                        if next_tok.text == "t1" piano_roll_note.tick_offset += 0;
+                        else if next_tok.text == "t2" piano_roll_note.tick_offset += 8;
+                        else if next_tok.text == "t3" piano_roll_note.tick_offset += 16;
+                    }
+                } else if token_sub.integer_value == 1 { piano_roll_note.tick_offset += 0; }
+                else if token_sub.integer_value == 2 { piano_roll_note.tick_offset += 16; }
+                else if token_sub.integer_value == 3 { piano_roll_note.tick_offset += 32; }
+            } else if token_sub.type == .IDENTIFIER {
+                if token_sub.text == "t1" || token_sub.text == "16t1" || token_sub.text == "8t1" || token_sub.text == "32t1" { piano_roll_note.tick_offset += 0; }
+                else if token_sub.text == "t2" || token_sub.text == "16t2" { piano_roll_note.tick_offset += 16; }
+                else if token_sub.text == "t3" || token_sub.text == "16t3" { piano_roll_note.tick_offset += 32; }
+                else if token_sub.text == "8t2" { piano_roll_note.tick_offset += 32; }
+                else if token_sub.text == "8t3" { piano_roll_note.tick_offset += 64; }
+                else if token_sub.text == "32t2" { piano_roll_note.tick_offset += 8; }
+                else if token_sub.text == "32t3" { piano_roll_note.tick_offset += 16; }
+            }
         } else if parameter_name == "len" || parameter_name == "length" {
-            length_token, length_success := consume_token(parser, .INTEGER, "Expected integer for note step length");
-            if !length_success return false;
-            piano_roll_note.step_length = length_token.integer_value;
+            len_token := current_token(parser);
+            if len_token.type == .INTEGER {
+                next_tok := peek_token(parser, 1);
+                if (len_token.integer_value == 8 || len_token.integer_value == 16 || len_token.integer_value == 32) && next_tok.type == .IDENTIFIER && (next_tok.text == "t" || next_tok.text == "T") {
+                    advance_token(parser);
+                    advance_token(parser);
+                    if len_token.integer_value == 8 {
+                        piano_roll_note.length_ticks = 32;
+                    } else if len_token.integer_value == 16 {
+                        piano_roll_note.length_ticks = 16;
+                    } else if len_token.integer_value == 32 {
+                        piano_roll_note.length_ticks = 8;
+                    }
+                    piano_roll_note.step_length = 1;
+                } else {
+                    advance_token(parser);
+                    piano_roll_note.step_length = len_token.integer_value;
+                }
+            } else if len_token.type == .FLOAT {
+                advance_token(parser);
+                piano_roll_note.length_ticks = cast(s64) (len_token.float_value * cast(float64) TICKS_PER_STEP + 0.5);
+                piano_roll_note.step_length = ifx piano_roll_note.length_ticks < 24 then 1 else piano_roll_note.length_ticks / 24;
+            } else if len_token.type == .IDENTIFIER {
+                advance_token(parser);
+                if len_token.text == "8t" {
+                    piano_roll_note.length_ticks = 32;
+                } else if len_token.text == "16t" {
+                    piano_roll_note.length_ticks = 16;
+                } else if len_token.text == "32t" {
+                    piano_roll_note.length_ticks = 8;
+                }
+            } else {
+                set_error(parser, len_token.location, sprint("Expected integer or identifier for length, got '%'", len_token.text));
+                return false;
+            }
+        } else if parameter_name == "len_ticks" || parameter_name == "length_ticks" {
+            ticks_token, ticks_success := consume_token(parser, .INTEGER, "Expected integer for note length in ticks");
+            if !ticks_success return false;
+            piano_roll_note.length_ticks = ticks_token.integer_value;
         } else if parameter_name == "vel" || parameter_name == "velocity" {
             velocity_value, velocity_success := parse_number(parser);
             if !velocity_success return false;
