@@ -40,9 +40,9 @@ lexer_tests :: () {
     });
 
     test("tokenize operators and delimiters", () {
-        tokens, success, error_message := tokenize("= : -> | - , / .");
+        tokens, success, error_message := tokenize("= : -> | - , / . %");
         expect_true(success);
-        expect_equals(tokens.count, 9);
+        expect_equals(tokens.count, 10);
         expect_equals(tokens[0].type, Token_Type.EQUALS);
         expect_equals(tokens[1].type, Token_Type.COLON);
         expect_equals(tokens[2].type, Token_Type.ARROW);
@@ -51,7 +51,9 @@ lexer_tests :: () {
         expect_equals(tokens[5].type, Token_Type.COMMA);
         expect_equals(tokens[6].type, Token_Type.SLASH);
         expect_equals(tokens[7].type, Token_Type.DOT);
+        expect_equals(tokens[8].type, Token_Type.PERCENT);
     });
+
 
     test("tokenize comments and newlines", () {
         text := "# This is a comment\nbpm = 128 // inline comment\n\nname = \"Track\"";

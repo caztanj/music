@@ -1,13 +1,15 @@
-initialize_sequencer_clock :: (clock: *Sequencer_Clock, sample_rate: s64 = DEFAULT_SAMPLE_RATE, beats_per_minute: float = 120.0, total_bars: s64 = 16, time_signature_numerator: s64 = 4, time_signature_denominator: s64 = 4) {
+initialize_sequencer_clock :: (clock: *Sequencer_Clock, sample_rate: s64 = DEFAULT_SAMPLE_RATE, beats_per_minute: float = 120.0, total_bars: s64 = 16, time_signature_numerator: s64 = 4, time_signature_denominator: s64 = 4, swing: float = 0.5) {
     clock.current_sample = 0;
     clock.sample_rate = sample_rate;
     clock.beats_per_minute = beats_per_minute;
     clock.total_bars = total_bars;
     clock.time_signature_numerator = time_signature_numerator;
     clock.time_signature_denominator = time_signature_denominator;
+    clock.swing = swing;
     clock.is_playing = true;
     clock.is_looping = true;
 }
+
 
 calculate_samples_per_beat :: (sample_rate: s64, beats_per_minute: float) -> float64 {
     if beats_per_minute <= 0.0 {
@@ -25,6 +27,27 @@ calculate_samples_per_step :: (sample_rate: s64, beats_per_minute: float) -> flo
 
     return samples_per_step;
 }
+
+calculate_step_sample_position :: (step_index: s64, samples_per_step: float64, swing_amount: float = 0.5) -> u64 {
+    clamped_swing := clamp_swing_value(swing_amount);
+    is_odd_step := (step_index % 2) != 0;
+
+    effective_step := cast(float64) step_index;
+    if is_odd_step {
+        swing_offset := cast(float64) (2.0 * (clamped_swing - 0.5));
+        effective_step += swing_offset;
+    }
+
+    if effective_step < 0.0 {
+        return 0;
+    }
+
+    sample_position := cast(u64) (effective_step * samples_per_step + 0.5);
+
+    return sample_position;
+}
+
+
 
 calculate_samples_per_bar :: (sample_rate: s64, beats_per_minute: float, time_signature_numerator: s64 = 4) -> float64 {
     samples_per_step := calculate_samples_per_step(sample_rate, beats_per_minute);
@@ -184,11 +207,12 @@ initialize_sequencer :: (sequencer: *Sequencer, sample_rate: s64 = DEFAULT_SAMPL
 }
 
 configure_sequencer_from_song :: (sequencer: *Sequencer, song_specification: *Song_Specification, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
-    initialize_sequencer_clock(*sequencer.clock, sample_rate, song_specification.project.beats_per_minute, song_specification.project.total_bars, song_specification.project.time_signature_numerator, song_specification.project.time_signature_denominator);
+    initialize_sequencer_clock(*sequencer.clock, sample_rate, song_specification.project.beats_per_minute, song_specification.project.total_bars, song_specification.project.time_signature_numerator, song_specification.project.time_signature_denominator, song_specification.project.swing);
     initialize_sample_pool(*sequencer.sample_pool);
     load_samples_for_song(*sequencer.sample_pool, song_specification);
     sequencer.event_count = 0;
 }
+
 
 find_instrument_for_pattern :: (song_specification: *Song_Specification, pattern: *Pattern_Definition) -> *Instrument_Definition, bool {
     exact_instrument, exact_found := find_instrument(song_specification, pattern.name);
@@ -264,7 +288,7 @@ add_sequencer_event :: (sequencer: *Sequencer, event_type: Sequencer_Event_Type,
     sequencer.event_count += 1;
 }
 
-collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Specification, global_step_index: s64, sample_offset_in_block: s64) {
+collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Specification, global_step_index: s64, range_start_sample: u64, range_end_sample: u64, base_offset: s64, samples_per_step: float64) {
     bar_index := (global_step_index / STEPS_PER_BAR) + 1;
     step_in_bar := global_step_index % STEPS_PER_BAR;
 
@@ -274,53 +298,60 @@ collect_events_at_step :: (sequencer: *Sequencer, song_specification: *Song_Spec
         if bar_index >= clip.start_bar && bar_index <= clip.end_bar {
             pattern, pattern_found := find_pattern(song_specification, clip.pattern_name);
             if pattern_found {
-                note_index := 0;
-                while note_index < pattern.piano_roll_notes.count {
-                    note := *pattern.piano_roll_notes[note_index];
-                    if (note.start_step + note.step_length) % STEPS_PER_BAR == step_in_bar {
-                        instrument, instrument_found := find_instrument_for_pattern(song_specification, pattern);
-                        if instrument_found {
-                            routing, routing_found := find_routing_for_instrument(song_specification, instrument.name);
-                            track_index := ifx routing_found then routing.track_index else 1;
-                            add_sequencer_event(sequencer, .NOTE_OFF, instrument.name, track_index, note.midi_note_number, 0.0, sample_offset_in_block);
-                        }
-                    }
+                pattern_swing := get_pattern_effective_swing(song_specification, pattern);
+                step_sample := calculate_step_sample_position(global_step_index, samples_per_step, pattern_swing);
 
-                    note_index += 1;
-                }
+                if step_sample >= range_start_sample && step_sample < range_end_sample {
+                    sample_offset_in_block := base_offset + cast(s64) (step_sample - range_start_sample);
 
-                track_index := 0;
-                while track_index < pattern.step_tracks.count {
-                    step_track := *pattern.step_tracks[track_index];
-                    if step_in_bar < step_track.steps.count && step_track.steps[step_in_bar] {
-                        routing, routing_found := find_routing_for_instrument(song_specification, step_track.instrument_name);
-                        mixer_track := ifx routing_found then routing.track_index else 1;
-                        velocity := ifx step_in_bar < step_track.velocities.count then step_track.velocities[step_in_bar] else 1.0;
-                        root_note: s32 = 60;
-                        target_instrument, target_found := find_instrument(song_specification, step_track.instrument_name);
-                        if target_found && target_instrument.type == .SAMPLER {
-                            root_note = target_instrument.sampler.root_midi_note;
+                    note_index := 0;
+                    while note_index < pattern.piano_roll_notes.count {
+                        note := *pattern.piano_roll_notes[note_index];
+                        if (note.start_step + note.step_length) % STEPS_PER_BAR == step_in_bar {
+                            instrument, instrument_found := find_instrument_for_pattern(song_specification, pattern);
+                            if instrument_found {
+                                routing, routing_found := find_routing_for_instrument(song_specification, instrument.name);
+                                track_index := ifx routing_found then routing.track_index else 1;
+                                add_sequencer_event(sequencer, .NOTE_OFF, instrument.name, track_index, note.midi_note_number, 0.0, sample_offset_in_block);
+                            }
                         }
 
-                        add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, velocity, sample_offset_in_block);
+                        note_index += 1;
                     }
 
-                    track_index += 1;
-                }
+                    track_index := 0;
+                    while track_index < pattern.step_tracks.count {
+                        step_track := *pattern.step_tracks[track_index];
+                        if step_in_bar < step_track.steps.count && step_track.steps[step_in_bar] {
+                            routing, routing_found := find_routing_for_instrument(song_specification, step_track.instrument_name);
+                            mixer_track := ifx routing_found then routing.track_index else 1;
+                            velocity := ifx step_in_bar < step_track.velocities.count then step_track.velocities[step_in_bar] else 1.0;
+                            root_note: s32 = 60;
+                            target_instrument, target_found := find_instrument(song_specification, step_track.instrument_name);
+                            if target_found && target_instrument.type == .SAMPLER {
+                                root_note = target_instrument.sampler.root_midi_note;
+                            }
 
-                note_index = 0;
-                while note_index < pattern.piano_roll_notes.count {
-                    note := *pattern.piano_roll_notes[note_index];
-                    if note.start_step == step_in_bar {
-                        instrument, instrument_found := find_instrument_for_pattern(song_specification, pattern);
-                        if instrument_found {
-                            routing, routing_found := find_routing_for_instrument(song_specification, instrument.name);
-                            track_index := ifx routing_found then routing.track_index else 1;
-                            add_sequencer_event(sequencer, .NOTE_ON, instrument.name, track_index, note.midi_note_number, note.velocity, sample_offset_in_block);
+                            add_sequencer_event(sequencer, .NOTE_ON, step_track.instrument_name, mixer_track, root_note, velocity, sample_offset_in_block);
                         }
+
+                        track_index += 1;
                     }
 
-                    note_index += 1;
+                    note_index = 0;
+                    while note_index < pattern.piano_roll_notes.count {
+                        note := *pattern.piano_roll_notes[note_index];
+                        if note.start_step == step_in_bar {
+                            instrument, instrument_found := find_instrument_for_pattern(song_specification, pattern);
+                            if instrument_found {
+                                routing, routing_found := find_routing_for_instrument(song_specification, instrument.name);
+                                track_index := ifx routing_found then routing.track_index else 1;
+                                add_sequencer_event(sequencer, .NOTE_ON, instrument.name, track_index, note.midi_note_number, note.velocity, sample_offset_in_block);
+                            }
+                        }
+
+                        note_index += 1;
+                    }
                 }
             }
         }
@@ -335,24 +366,33 @@ collect_events_in_range :: (sequencer: *Sequencer, song_specification: *Song_Spe
         return;
     }
 
-    first_step := cast(s64) (cast(float64) range_start_sample / samples_per_step);
+    first_step := cast(s64) (cast(float64) range_start_sample / samples_per_step) - 1;
     if first_step < 0 {
         first_step = 0;
     }
 
+    last_step := cast(s64) (cast(float64) range_end_sample / samples_per_step) + 2;
+
     step_index := first_step;
-    while true {
-        step_sample := cast(u64) (cast(float64) step_index * samples_per_step);
-        if step_sample >= range_end_sample {
-            break;
-        }
-
-        if step_sample >= range_start_sample {
-            sample_offset := base_offset + cast(s64) (step_sample - range_start_sample);
-            collect_events_at_step(sequencer, song_specification, step_index, sample_offset);
-        }
-
+    while step_index <= last_step {
+        collect_events_at_step(sequencer, song_specification, step_index, range_start_sample, range_end_sample, base_offset, samples_per_step);
         step_index += 1;
+    }
+}
+
+sort_sequencer_events :: (sequencer: *Sequencer) {
+    index := 1;
+    while index < sequencer.event_count {
+        current_event := sequencer.events[index];
+        hole := index;
+
+        while hole > 0 && sequencer.events[hole - 1].sample_offset_in_block > current_event.sample_offset_in_block {
+            sequencer.events[hole] = sequencer.events[hole - 1];
+            hole -= 1;
+        }
+
+        sequencer.events[hole] = current_event;
+        index += 1;
     }
 }
 
@@ -375,7 +415,10 @@ collect_sequencer_events_for_block :: (sequencer: *Sequencer, song_specification
     } else {
         collect_events_in_range(sequencer, song_specification, block_start_sample, block_end_sample, 0);
     }
+
+    sort_sequencer_events(sequencer);
 }
+
 
 dispatch_sequencer_event :: (event: *Sequencer_Event, song_specification: *Song_Specification, voice_manager: *Voice_Manager, sample_pool: *Sample_Pool = null) {
     if event.event_type == {
@@ -490,9 +533,11 @@ Sequencer_Clock :: struct {
     time_signature_numerator: s64 = 4;
     time_signature_denominator: s64 = 4;
     total_bars: s64 = 16;
+    swing: float = 0.5;
     is_playing: bool = true;
     is_looping: bool = true;
 }
+
 
 Sample_Pool_Entry :: struct {
     instrument_name: string;

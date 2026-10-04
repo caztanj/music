@@ -271,7 +271,32 @@ saturation_type_to_string :: (saturation_type: Saturation_Type) -> string {
     }
 }
 
+clamp_swing_value :: (swing_amount: float) -> float {
+    clamped_value := swing_amount;
+    if clamped_value < 0.0 {
+        clamped_value = 0.0;
+    }
+    if clamped_value > 0.95 {
+        clamped_value = 0.95;
+    }
+
+    return clamped_value;
+}
+
+get_pattern_effective_swing :: (song_specification: *Song_Specification, pattern: *Pattern_Definition) -> float {
+    if pattern != null && pattern.swing >= 0.0 {
+        return clamp_swing_value(pattern.swing);
+    }
+
+    if song_specification != null {
+        return clamp_swing_value(song_specification.project.swing);
+    }
+
+    return 0.5;
+}
+
 Waveform_Type :: enum {
+
     SAWTOOTH;
     SQUARE;
     SINE;
@@ -309,8 +334,10 @@ Project_Configuration :: struct {
     time_signature_numerator: s64 = 4;
     time_signature_denominator: s64 = 4;
     total_bars: s64 = 16;
+    swing: float = 0.5;
     location: Source_Location;
 }
+
 
 Envelope_Configuration :: struct {
     attack_milliseconds: float = 10.0;
@@ -408,8 +435,10 @@ Pattern_Definition :: struct {
     step_tracks: [..] Step_Sequencer_Track;
     piano_roll_notes: [..] Piano_Roll_Note;
     step_count: s64 = STEPS_PER_BAR;
+    swing: float = -1.0;
     location: Source_Location;
 }
+
 
 Mixer_Track_Definition :: struct {
     track_index: s64 = 1;

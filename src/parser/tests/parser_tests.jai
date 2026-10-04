@@ -201,4 +201,78 @@ END;
         expect_true(!success);
         expect_true(error_message.count > 0);
     });
+
+    test("project swing and shuffle parsing", () {
+        song_text := #string END
+[project]
+name = "Swing Track"
+bpm = 120
+swing = 58%
+
+[instruments]
+lead = synth(wave="saw")
+
+[pattern melody]
+C4 step=0 len=1
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+lead -> track 1
+
+[arrangement]
+bar 1: melody
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "test.song", check_samples_on_disk = false);
+        expect_true(success);
+        expect_near(song_specification.project.swing, 0.58, 0.001);
+    });
+
+    test("pattern swing in header and body", () {
+        song_text := #string END
+[project]
+name = "Pattern Swing Track"
+bpm = 120
+swing = 50%
+
+[instruments]
+kick = synth(wave="sine")
+lead = synth(wave="saw")
+
+[pattern drums swing=66%]
+kick | x . x . |
+
+[pattern melody]
+swing = 0.70
+C4 step=0 len=1
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+lead -> track 1
+
+[arrangement]
+bar 1: drums
+bar 1: melody
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "test.song", check_samples_on_disk = false);
+        expect_true(success);
+        drums_pattern, drums_found := find_pattern(*song_specification, "drums");
+        expect_true(drums_found);
+        expect_near(drums_pattern.swing, 0.66, 0.001);
+        expect_near(get_pattern_effective_swing(*song_specification, drums_pattern), 0.66, 0.001);
+
+        melody_pattern, melody_found := find_pattern(*song_specification, "melody");
+        expect_true(melody_found);
+        expect_near(melody_pattern.swing, 0.70, 0.001);
+        expect_near(get_pattern_effective_swing(*song_specification, melody_pattern), 0.70, 0.001);
+    });
 }
+

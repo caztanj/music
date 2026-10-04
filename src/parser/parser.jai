@@ -86,11 +86,32 @@ parse_entire_song :: (parser: *Parser, song_specification: *Song_Specification) 
             pattern_name := pattern_name_token.text;
             advance_token(parser);
 
+            initial_swing: float = -1.0;
+            if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "swing" || current_token(parser).text == "shuffle") {
+                advance_token(parser);
+                equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after swing parameter in pattern header");
+                if !equals_success return false;
+
+                number_value, number_success := parse_number(parser);
+                if !number_success return false;
+
+                if current_token(parser).type == .PERCENT {
+                    advance_token(parser);
+                }
+
+                swing_value := cast(float) number_value;
+                if swing_value > 1.0 {
+                    swing_value /= 100.0;
+                }
+                initial_swing = clamp_swing_value(swing_value);
+            }
+
             close_token, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' after pattern name");
             if !close_success return false;
 
-            success := parse_pattern_section(parser, pattern_name, pattern_name_token.location, song_specification);
+            success := parse_pattern_section(parser, pattern_name, pattern_name_token.location, song_specification, initial_swing);
             if !success return false;
+
         } else if section_name == "mixer" {
             close_token, close_success := consume_token(parser, .CLOSE_BRACKET, "Expected ']' after mixer section header");
             if !close_success return false;
@@ -163,10 +184,24 @@ parse_project_section :: (parser: *Parser, song_specification: *Song_Specificati
 
             song_specification.project.time_signature_numerator = numerator_token.integer_value;
             song_specification.project.time_signature_denominator = denominator_token.integer_value;
+        } else if property_name == "swing" || property_name == "shuffle" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+            }
+
+            swing_value := cast(float) number_value;
+            if swing_value > 1.0 {
+                swing_value /= 100.0;
+            }
+            song_specification.project.swing = clamp_swing_value(swing_value);
         } else {
             set_error(parser, token.location, sprint("Unknown project property '%'", property_name));
             return false;
         }
+
     }
 
     return true;
@@ -546,10 +581,11 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
     return true;
 }
 
-parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Source_Location, song_specification: *Song_Specification) -> bool {
+parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Source_Location, song_specification: *Song_Specification, initial_swing: float = -1.0) -> bool {
     pattern: Pattern_Definition;
     pattern.name = pattern_name;
     pattern.location = location;
+    pattern.swing = initial_swing;
 
     while !parser.has_error && parser.current_token_index < parser.tokens.count {
         skip_newlines(parser);
@@ -565,6 +601,25 @@ parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Sourc
         }
 
         next_token_peek := peek_token(parser, 1);
+        if (token.text == "swing" || token.text == "shuffle") && next_token_peek.type == .EQUALS {
+            advance_token(parser);
+            advance_token(parser);
+
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+            }
+
+            swing_value := cast(float) number_value;
+            if swing_value > 1.0 {
+                swing_value /= 100.0;
+            }
+            pattern.swing = clamp_swing_value(swing_value);
+            continue;
+        }
+
         if next_token_peek.type == .PIPE {
             success := parse_step_sequencer_row(parser, *pattern);
             if !success return false;
@@ -578,6 +633,7 @@ parse_pattern_section :: (parser: *Parser, pattern_name: string, location: Sourc
 
     return true;
 }
+
 
 parse_step_sequencer_row :: (parser: *Parser, pattern: *Pattern_Definition) -> bool {
     instrument_token := current_token(parser);

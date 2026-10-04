@@ -195,7 +195,18 @@ next_token :: (lexer: *Lexer) -> Token {
         return token;
     }
 
+    if character == #char "%" {
+        advance_character(lexer);
+        token: Token;
+        token.type = .PERCENT;
+        token.text = "%";
+        token.location = location;
+
+        return token;
+    }
+
     if character == #char "\"" {
+
         return scan_string(lexer);
     }
 
@@ -485,6 +496,7 @@ Token_Type :: enum {
     COMMA;
     SLASH;
     DOT;
+    PERCENT;
     STEP_HIT;
 }
 

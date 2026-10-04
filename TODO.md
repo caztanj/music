@@ -4,8 +4,9 @@
 |---|---|---|:---:|
 | **Phase 10** | Synth Expansion & Modulation | Multi-osc, Unison/Detune, Noise, Filter ADSR & LFOs | 🟢 Completed |
 | **Phase 11** | Studio Effects Suite | Algorithmic Reverb, 3-Band Parametric EQ, Chorus/Flanger | 🟢 Completed |
-| **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | 🟡 In Progress |
-| **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | ⬜ Planned |
+| **Phase 12** | Dynamics & Sidechain Engine | Compressor with Sidechain Ducking, Aux Send/Return Busses | 🟢 Completed |
+| **Phase 13** | Musical Expression & Groove | Swing/Shuffle, Portamento/Glide, Triplets, Velocity Scaling | 🟡 In Progress |
+
 | **Phase 14** | Advanced Drum Sampler | Choke Groups, Sampler ADSR, Start Offsets, Reverse Playback | ⬜ Planned |
 | **Phase 15** | Automation & Modulation Curves | Timeline Parameter Automation (Sweeps, Risers, Fades) | ⬜ Planned |
 | **Phase 16** | Mastering & Multi-Track Stems | LUFS Loudness Metering, Stem Export, TPDF Dither | ⬜ Planned |
@@ -81,9 +82,10 @@
 
 > **Goal**: Break out of mechanical, rigid sequencing into humanized, swinging, expressive musical performances.
 
-- [ ] **13.1 Swing / Shuffle Engine (`src/engine/sequencer.jai`)**
-  - [ ] Configurable 16th-note swing amount (50% = straight, 58% = subtle groove, 66% = hard triplet swing, up to 75%).
-  - [ ] Global and per-pattern swing settings.
+- [x] **13.1 Swing / Shuffle Engine (`src/engine/sequencer.jai`)**
+  - [x] Configurable 16th-note swing amount (50% = straight, 58% = subtle groove, 66% = hard triplet swing, up to 75%).
+  - [x] Global and per-pattern swing settings.
+
 - [ ] **13.2 Portamento / Monophonic Glide**
   - [ ] Smooth exponential pitch glide between overlapping notes in monophonic synth modes.
   - [ ] Configurable glide time in milliseconds or tempo-synced beats (ideal for 808 bass glides and lead melodies).
