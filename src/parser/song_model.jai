@@ -453,6 +453,11 @@ Sampler_Configuration :: struct {
     gain: float = 1.0;
     root_midi_note: s32 = 60;
     choke_group: s32 = 0;
+    envelope: Envelope_Configuration = .{attack_milliseconds = 0.0, decay_milliseconds = 0.0, sustain_level = 1.0, release_milliseconds = 10.0};
+    has_envelope: bool = false;
+    is_looping: bool = false;
+    loop_start_frame: s64 = 0;
+    loop_end_frame: s64 = 0;
 }
 
 Synthesizer_Configuration :: struct {

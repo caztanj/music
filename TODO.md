@@ -106,9 +106,9 @@
 
 - [x] **14.1 Choke Groups (`src/dsp/sampler.jai`, `src/engine/voice_manager.jai`)**
   - [x] Exclusive voice groups (e.g. Choke Group 1: Closed Hi-Hat instantly cuts off ringing Open Hi-Hat).
-- [ ] **14.2 Sampler ADSR & Volume Envelopes**
-  - [ ] Per-sample Attack and Decay envelopes to reshape transient punch or eliminate clicks.
-  - [ ] Sustained sample loops with loop start / loop end markers.
+- [x] **14.2 Sampler ADSR & Volume Envelopes**
+  - [x] Per-sample Attack and Decay envelopes to reshape transient punch or eliminate clicks.
+  - [x] Sustained sample loops with loop start / loop end markers.
 - [ ] **14.3 Sample Manipulation Parameters**
   - [ ] Sample start offset (skip silent intros or slice sample attacks).
   - [ ] Reverse playback flag (for reverse cymbals, snare swells, and transitional risers).

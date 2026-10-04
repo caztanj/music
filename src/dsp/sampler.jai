@@ -131,9 +131,14 @@ initialize_sampler_voice :: (voice: *Sampler_Voice, sample_rate: s64 = DEFAULT_S
     voice.is_one_shot = true;
     voice.sample_rate = sample_rate;
     voice.choke_group = 0;
+    voice.has_envelope = false;
+    voice.is_looping = false;
+    voice.loop_start_frame = 0;
+    voice.loop_end_frame = 0;
+    reset_envelope(*voice.envelope);
 }
 
-trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0) {
+trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0, envelope_configuration: Envelope_Configuration = .{}, has_envelope: bool = false, is_looping: bool = false, loop_start_frame: s64 = 0, loop_end_frame: s64 = 0) {
     voice.buffer = buffer;
     voice.playhead_frame = 0.0;
     voice.velocity = velocity;
@@ -141,6 +146,10 @@ trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer,
     voice.is_one_shot = is_one_shot;
     voice.is_active = true;
     voice.choke_group = choke_group;
+    voice.has_envelope = has_envelope;
+    voice.is_looping = is_looping;
+    voice.loop_start_frame = loop_start_frame;
+    voice.loop_end_frame = loop_end_frame;
 
     if buffer != null && buffer.sample_rate > 0 && voice.sample_rate > 0 {
         semitone_difference := cast(float64) (midi_note_number - buffer.root_midi_note);
@@ -150,10 +159,19 @@ trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer,
     } else {
         voice.playback_speed = 1.0;
     }
+
+    if has_envelope {
+        configure_envelope(*voice.envelope, envelope_configuration, voice.sample_rate);
+        trigger_attack(*voice.envelope);
+    } else {
+        reset_envelope(*voice.envelope);
+    }
 }
 
 trigger_sampler_note_off :: (voice: *Sampler_Voice) {
-    if !voice.is_one_shot {
+    if voice.has_envelope {
+        trigger_release(*voice.envelope);
+    } else if !voice.is_one_shot {
         voice.is_active = false;
     }
 }
@@ -163,12 +181,27 @@ reset_sampler_voice :: (voice: *Sampler_Voice) {
     voice.playhead_frame = 0.0;
     voice.buffer = null;
     voice.choke_group = 0;
+    voice.has_envelope = false;
+    voice.is_looping = false;
+    voice.loop_start_frame = 0;
+    voice.loop_end_frame = 0;
+    reset_envelope(*voice.envelope);
 }
 
 is_sampler_voice_active :: (voice: *Sampler_Voice) -> bool {
-    is_active := voice.is_active && voice.buffer != null;
+    if !voice.is_active || voice.buffer == null {
+        return false;
+    }
+    if voice.has_envelope {
+        if !is_envelope_active(*voice.envelope) {
+            return false;
+        }
+        if voice.envelope.state == .SUSTAIN && voice.envelope.sustain_level <= 0.0 {
+            return false;
+        }
+    }
 
-    return is_active;
+    return true;
 }
 
 render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
@@ -176,7 +209,32 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
         return 0.0, 0.0;
     }
 
+    effective_loop_start := voice.loop_start_frame;
+    if effective_loop_start < 0 effective_loop_start = 0;
+
+    effective_loop_end := voice.loop_end_frame;
+    if effective_loop_end <= 0 || effective_loop_end > voice.buffer.frame_count {
+        effective_loop_end = voice.buffer.frame_count;
+    }
+    if effective_loop_start >= effective_loop_end {
+        effective_loop_start = 0;
+    }
+
+    if voice.is_looping && effective_loop_end > effective_loop_start {
+        loop_length := effective_loop_end - effective_loop_start;
+        while voice.playhead_frame >= cast(float64) effective_loop_end {
+            voice.playhead_frame -= cast(float64) loop_length;
+        }
+    } else {
+        if voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
+            voice.is_active = false;
+
+            return 0.0, 0.0;
+        }
+    }
+
     frame_index_0 := cast(s64) voice.playhead_frame;
+    if frame_index_0 < 0 frame_index_0 = 0;
     if frame_index_0 >= voice.buffer.frame_count {
         voice.is_active = false;
 
@@ -184,8 +242,14 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
     }
 
     frame_index_1 := frame_index_0 + 1;
-    if frame_index_1 >= voice.buffer.frame_count {
-        frame_index_1 = frame_index_0;
+    if voice.is_looping && effective_loop_end > effective_loop_start {
+        if frame_index_1 >= effective_loop_end {
+            frame_index_1 = effective_loop_start;
+        }
+    } else {
+        if frame_index_1 >= voice.buffer.frame_count {
+            frame_index_1 = frame_index_0;
+        }
     }
 
     fractional_part := cast(float) (voice.playhead_frame - cast(float64) frame_index_0);
@@ -198,11 +262,19 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
     sample_1_right := get_sample_from_buffer(voice.buffer, frame_index_1, 1);
     interpolated_right := sample_0_right + fractional_part * (sample_1_right - sample_0_right);
 
-    output_left := interpolated_left * voice.velocity * voice.gain;
-    output_right := interpolated_right * voice.velocity * voice.gain;
+    envelope_factor: float = 1.0;
+    if voice.has_envelope {
+        envelope_factor = process_envelope_sample(*voice.envelope);
+        if !is_envelope_active(*voice.envelope) || (voice.envelope.state == .SUSTAIN && voice.envelope.sustain_level <= 0.0) {
+            voice.is_active = false;
+        }
+    }
+
+    output_left := interpolated_left * voice.velocity * voice.gain * envelope_factor;
+    output_right := interpolated_right * voice.velocity * voice.gain * envelope_factor;
 
     voice.playhead_frame += voice.playback_speed;
-    if voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
+    if !voice.is_looping && voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
         voice.is_active = false;
     }
 
@@ -248,4 +320,9 @@ Sampler_Voice :: struct {
     is_one_shot: bool = true;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
     choke_group: s32 = 0;
+    envelope: Envelope_Generator;
+    has_envelope: bool = false;
+    is_looping: bool = false;
+    loop_start_frame: s64 = 0;
+    loop_end_frame: s64 = 0;
 }

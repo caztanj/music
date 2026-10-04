@@ -64,6 +64,42 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
 }
 
 
+trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, buffer: *Audio_Sample_Buffer, configuration: Sampler_Configuration, midi_note_number: s32 = 60, velocity: float = 1.0) -> *Voice_Slot {
+    if configuration.choke_group > 0 {
+        choke_voices_in_group(voice_manager, configuration.choke_group);
+    }
+
+    slot := find_available_voice_slot(voice_manager);
+    slot.kind = .SAMPLER;
+    slot.instrument_name = instrument_name;
+    slot.mixer_track_index = mixer_track_index;
+    slot.midi_note_number = midi_note_number;
+    slot.velocity = velocity;
+    slot.choke_group = configuration.choke_group;
+    slot.age_samples = 0;
+
+    is_one_shot := !configuration.is_looping && !configuration.has_envelope;
+
+    initialize_sampler_voice(*slot.sampler_voice, voice_manager.sample_rate);
+    trigger_sampler_note_on(
+        *slot.sampler_voice,
+        buffer,
+        midi_note_number,
+        velocity,
+        is_one_shot = is_one_shot,
+        gain = configuration.gain,
+        choke_group = configuration.choke_group,
+        envelope_configuration = configuration.envelope,
+        has_envelope = configuration.has_envelope,
+        is_looping = configuration.is_looping,
+        loop_start_frame = configuration.loop_start_frame,
+        loop_end_frame = configuration.loop_end_frame
+    );
+
+    return slot;
+}
+
+
 trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0) -> *Voice_Slot {
     if choke_group > 0 {
         choke_voices_in_group(voice_manager, choke_group);
@@ -250,11 +286,19 @@ find_available_voice_slot :: (voice_manager: *Voice_Manager) -> *Voice_Slot {
                 lowest_releasing_level = current_level;
                 best_releasing_slot = slot;
             }
+        } else if slot.kind == .SAMPLER && slot.sampler_voice.has_envelope && slot.sampler_voice.envelope.state == .RELEASE {
+            current_level := slot.sampler_voice.envelope.current_level;
+            if current_level < lowest_releasing_level {
+                lowest_releasing_level = current_level;
+                best_releasing_slot = slot;
+            }
         }
 
         effective_volume := slot.velocity;
         if slot.kind == .SYNTHESIZER {
             effective_volume *= slot.synthesizer_voice.amplitude_envelope.current_level;
+        } else if slot.kind == .SAMPLER && slot.sampler_voice.has_envelope {
+            effective_volume *= slot.sampler_voice.envelope.current_level;
         }
 
         if effective_volume < lowest_effective_volume || (effective_volume == lowest_effective_volume && slot.age_samples > oldest_playing_age) {

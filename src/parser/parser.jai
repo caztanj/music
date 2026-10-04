@@ -350,6 +350,31 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
         parameter_name := argument_token.text;
         advance_token(parser);
 
+        if parameter_name == "loop" || parameter_name == "looping" {
+            if current_token(parser).type == .EQUALS {
+                advance_token(parser);
+                val_tok := current_token(parser);
+                if val_tok.type == .IDENTIFIER {
+                    if val_tok.text == "on" || val_tok.text == "true" || val_tok.text == "yes" {
+                        sampler_configuration.is_looping = true;
+                        advance_token(parser);
+                    } else if val_tok.text == "off" || val_tok.text == "false" || val_tok.text == "no" {
+                        sampler_configuration.is_looping = false;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, val_tok.location, sprint("Expected boolean for loop, got '%'", val_tok.text));
+                        return false;
+                    }
+                } else {
+                    set_error(parser, val_tok.location, "Expected on/off for loop");
+                    return false;
+                }
+            } else {
+                sampler_configuration.is_looping = true;
+            }
+            continue;
+        }
+
         equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after parameter name");
         if !equals_success return false;
 
@@ -398,6 +423,56 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
                 set_error(parser, token.location, "Expected integer or identifier for choke group");
                 return false;
             }
+        } else if parameter_name == "attack" || parameter_name == "att" {
+            attack_value, attack_success := parse_number(parser);
+            if !attack_success return false;
+            val := cast(float) attack_value;
+            if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "ms" || current_token(parser).text == "s") {
+                if current_token(parser).text == "s" val *= 1000.0;
+                advance_token(parser);
+            }
+            sampler_configuration.envelope.attack_milliseconds = val;
+            sampler_configuration.has_envelope = true;
+        } else if parameter_name == "decay" || parameter_name == "dec" {
+            decay_value, decay_success := parse_number(parser);
+            if !decay_success return false;
+            val := cast(float) decay_value;
+            if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "ms" || current_token(parser).text == "s") {
+                if current_token(parser).text == "s" val *= 1000.0;
+                advance_token(parser);
+            }
+            sampler_configuration.envelope.decay_milliseconds = val;
+            sampler_configuration.has_envelope = true;
+        } else if parameter_name == "sustain" || parameter_name == "sus" {
+            sustain_value, sustain_success := parse_number(parser);
+            if !sustain_success return false;
+            val := cast(float) sustain_value;
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+                val /= 100.0;
+            }
+            sampler_configuration.envelope.sustain_level = val;
+            sampler_configuration.has_envelope = true;
+        } else if parameter_name == "release" || parameter_name == "rel" {
+            release_value, release_success := parse_number(parser);
+            if !release_success return false;
+            val := cast(float) release_value;
+            if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "ms" || current_token(parser).text == "s") {
+                if current_token(parser).text == "s" val *= 1000.0;
+                advance_token(parser);
+            }
+            sampler_configuration.envelope.release_milliseconds = val;
+            sampler_configuration.has_envelope = true;
+        } else if parameter_name == "loop_start" || parameter_name == "loop_start_frame" {
+            loop_start_val, loop_start_ok := parse_number(parser);
+            if !loop_start_ok return false;
+            sampler_configuration.loop_start_frame = cast(s64) loop_start_val;
+            sampler_configuration.is_looping = true;
+        } else if parameter_name == "loop_end" || parameter_name == "loop_end_frame" {
+            loop_end_val, loop_end_ok := parse_number(parser);
+            if !loop_end_ok return false;
+            sampler_configuration.loop_end_frame = cast(s64) loop_end_val;
+            sampler_configuration.is_looping = true;
         } else {
             set_error(parser, argument_token.location, sprint("Unknown sampler parameter '%'", parameter_name));
             return false;

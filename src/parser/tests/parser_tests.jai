@@ -469,5 +469,50 @@ END;
         expect_true(lead_found);
         expect_equals(lead.synthesizer.choke_group, 2);
     });
+
+    test("sampler_adsr_and_loop_parameters_parsing", () {
+        song_text := #string END
+[project]
+name = "Sampler ADSR Test"
+bpm = 120
+time_signature = 4/4
+bars = 1
+
+[instruments]
+snare = sampler("samples/snare.wav", attack = 5ms, decay = 80ms, sustain = 25%, release = 100ms)
+pad = sampler("samples/pad.wav", loop = on, loop_start = 1000, loop_end = 20000)
+
+[pattern main]
+snare | x . . . |
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+snare -> track 1
+pad -> track 1
+
+[arrangement]
+bar 1: main
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "sampler_adsr.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        snare, snare_found := find_instrument(*song_specification, "snare");
+        expect_true(snare_found);
+        expect_true(snare.sampler.has_envelope);
+        expect_near(snare.sampler.envelope.attack_milliseconds, 5.0, 0.001);
+        expect_near(snare.sampler.envelope.decay_milliseconds, 80.0, 0.001);
+        expect_near(snare.sampler.envelope.sustain_level, 0.25, 0.001);
+        expect_near(snare.sampler.envelope.release_milliseconds, 100.0, 0.001);
+
+        pad, pad_found := find_instrument(*song_specification, "pad");
+        expect_true(pad_found);
+        expect_true(pad.sampler.is_looping);
+        expect_equals(pad.sampler.loop_start_frame, 1000);
+        expect_equals(pad.sampler.loop_end_frame, 20000);
+    });
 }
 

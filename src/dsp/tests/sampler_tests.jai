@@ -104,4 +104,96 @@ sampler_tests :: () {
 
         file_delete(test_file_path);
     });
+
+    test("sampler_attack_and_decay_volume_envelope", () {
+        raw_samples := NewArray(1000, float);
+        sample_index := 0;
+        while sample_index < raw_samples.count {
+            raw_samples[sample_index] = 1.0;
+            sample_index += 1;
+        }
+
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        envelope_config: Envelope_Configuration;
+        envelope_config.attack_milliseconds = 2.0;
+        envelope_config.decay_milliseconds = 5.0;
+        envelope_config.sustain_level = 0.0;
+        envelope_config.release_milliseconds = 5.0;
+
+        voice: Sampler_Voice;
+        initialize_sampler_voice(*voice, 44100);
+        trigger_sampler_note_on(
+            *voice,
+            *buffer,
+            60,
+            1.0,
+            is_one_shot = true,
+            gain = 1.0,
+            choke_group = 0,
+            envelope_configuration = envelope_config,
+            has_envelope = true
+        );
+
+        first_sample := render_sampler_sample(*voice);
+        expect_true(first_sample < 0.2);
+
+        step_counter := 0;
+        peak_level: float = 0.0;
+        while step_counter < 100 {
+            sample := render_sampler_sample(*voice);
+            if sample > peak_level peak_level = sample;
+            step_counter += 1;
+        }
+        expect_true(peak_level > 0.9);
+
+        decay_counter := 0;
+        while decay_counter < 300 {
+            render_sampler_sample(*voice);
+            decay_counter += 1;
+        }
+
+        expect_true(!is_sampler_voice_active(*voice));
+    });
+
+    test("sampler_loop_points_and_continuous_sustain", () {
+        raw_samples := NewArray(100, float);
+        sample_index := 0;
+        while sample_index < raw_samples.count {
+            raw_samples[sample_index] = cast(float) sample_index;
+            sample_index += 1;
+        }
+
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        voice: Sampler_Voice;
+        initialize_sampler_voice(*voice, 44100);
+        trigger_sampler_note_on(
+            *voice,
+            *buffer,
+            60,
+            1.0,
+            is_one_shot = false,
+            gain = 1.0,
+            choke_group = 0,
+            is_looping = true,
+            loop_start_frame = 20,
+            loop_end_frame = 60
+        );
+
+        frame_counter := 0;
+        while frame_counter < 150 {
+            sample := render_sampler_sample(*voice);
+            if frame_counter > 60 {
+                expect_true(sample >= 20.0 && sample <= 60.0);
+            }
+            frame_counter += 1;
+        }
+
+        expect_true(is_sampler_voice_active(*voice));
+        expect_true(voice.playhead_frame >= 20.0 && voice.playhead_frame <= 60.0);
+
+        trigger_sampler_note_off(*voice);
+        expect_true(!is_sampler_voice_active(*voice));
+    });
 }
