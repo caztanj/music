@@ -638,4 +638,101 @@ synth_tests :: () {
         expect_near(instrument.synthesizer.lfo_2.rate_hertz, 4.5, 0.001);
         expect_near(instrument.synthesizer.lfo_2.amount, 0.8, 0.001);
     });
+
+    test("portamento_exponential_pitch_glide", () {
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.is_monophonic = true;
+        configuration.portamento_milliseconds = 50.0;
+        configuration.envelope.attack_milliseconds = 1.0;
+        configuration.envelope.decay_milliseconds = 1000.0;
+        configuration.envelope.sustain_level = 1.0;
+        configuration.envelope.release_milliseconds = 1000.0;
+
+        voice: Synthesizer_Voice;
+        initialize_synthesizer_voice(*voice, configuration, 44100);
+
+        trigger_synthesizer_note_on(*voice, 36, 1.0);
+        initial_frequency := midi_to_hertz(36);
+        expect_near(voice.frequency_hertz, initial_frequency, 0.01);
+        expect_near(voice.target_frequency_hertz, initial_frequency, 0.01);
+
+        target_frequency := midi_to_hertz(48);
+        trigger_synthesizer_note_glide(*voice, 48, 1.0);
+        expect_near(voice.target_frequency_hertz, target_frequency, 0.01);
+        expect_near(voice.frequency_hertz, initial_frequency, 0.01);
+
+        sample_index := 0;
+        while sample_index < 500 {
+            render_synthesizer_sample(*voice);
+            sample_index += 1;
+        }
+
+        expect_true(voice.frequency_hertz > initial_frequency + 10.0);
+        expect_true(voice.frequency_hertz < target_frequency - 5.0);
+
+        while sample_index < 3000 {
+            render_synthesizer_sample(*voice);
+            sample_index += 1;
+        }
+
+        expect_near(voice.frequency_hertz, target_frequency, 0.05);
+    });
+
+    test("monophonic_voice_reuse_and_legato", () {
+        voice_manager: Voice_Manager;
+        initialize_voice_manager(*voice_manager, 44100);
+
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.is_monophonic = true;
+        configuration.portamento_milliseconds = 40.0;
+        configuration.legato = true;
+        configuration.envelope.attack_milliseconds = 5.0;
+        configuration.envelope.decay_milliseconds = 1000.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.envelope.release_milliseconds = 500.0;
+
+        slot_1 := trigger_synthesizer_note(*voice_manager, "lead", 1, configuration, 40, 1.0);
+        expect_equals(count_active_voices(*voice_manager), 1);
+
+        sample_index := 0;
+        while sample_index < 1000 {
+            render_voice_sample(slot_1);
+            sample_index += 1;
+        }
+
+        envelope_level_before_glide := slot_1.synthesizer_voice.amplitude_envelope.current_level;
+        expect_true(envelope_level_before_glide > 0.7);
+
+        slot_2 := trigger_synthesizer_note(*voice_manager, "lead", 1, configuration, 52, 0.9);
+        expect_equals(count_active_voices(*voice_manager), 1);
+        expect_true(slot_1 == slot_2);
+
+        expect_near(slot_2.synthesizer_voice.amplitude_envelope.current_level, envelope_level_before_glide, 0.05);
+        expect_near(slot_2.synthesizer_voice.target_frequency_hertz, midi_to_hertz(52), 0.01);
+    });
+
+    test("synthesizer_parser_portamento_and_monophonic_arguments", () {
+        song_text := "[project]\nname = \"Portamento Test\"\nbpm = 120\ntime_signature = 4/4\nbars = 1\n\n[instruments]\nbass = synth(wave=\"saw\", glide=60ms, mono=on, legato=on)\nlead = synth(wave=\"square\", portamento=\"1/16\", legato=off)\n\n[pattern melody]\nC4 step=0 len=1 vel=1.0\n\n[mixer]\ntrack 1: gain = 1.0, pan = 0.0, output = master\nmaster: gain = 1.0, limiter = on\n\n[channel_routing]\nbass -> track 1\nlead -> track 1\n\n[arrangement]\nbar 1: melody\n";
+
+        specification, parse_success, _ := parse_song(song_text, check_samples_on_disk = false);
+        expect_true(parse_success);
+
+        bass, bass_found := find_instrument(*specification, "bass");
+        expect_true(bass_found);
+        expect_true(bass.synthesizer.is_monophonic);
+        expect_near(bass.synthesizer.portamento_milliseconds, 60.0, 0.001);
+        expect_true(bass.synthesizer.legato);
+        expect_true(!bass.synthesizer.is_portamento_tempo_synced);
+
+        lead, lead_found := find_instrument(*specification, "lead");
+        expect_true(lead_found);
+        expect_true(lead.synthesizer.is_monophonic);
+        expect_true(lead.synthesizer.is_portamento_tempo_synced);
+        expect_equals(lead.synthesizer.portamento_tempo_sync_numerator, 1);
+        expect_equals(lead.synthesizer.portamento_tempo_sync_denominator, 16);
+        expect_true(!lead.synthesizer.legato);
+    });
 }
+

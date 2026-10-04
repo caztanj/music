@@ -572,10 +572,113 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
                 target_lfo.retrigger = false;
             }
             advance_token(parser);
+        } else if parameter_name == "glide" || parameter_name == "portamento" || parameter_name == "glide_time" || parameter_name == "portamento_time" {
+            glide_token := current_token(parser);
+            if glide_token.type == .STRING {
+                sync_success, numerator, denominator, is_triplet := parse_tempo_sync_string(glide_token.string_value);
+                if sync_success {
+                    synthesizer_configuration.is_portamento_tempo_synced = true;
+                    synthesizer_configuration.portamento_tempo_sync_numerator = numerator;
+                    synthesizer_configuration.portamento_tempo_sync_denominator = denominator;
+                    synthesizer_configuration.is_portamento_triplet = is_triplet;
+                    synthesizer_configuration.is_monophonic = true;
+                    advance_token(parser);
+                } else {
+                    cleaned_text := glide_token.string_value;
+                    if cleaned_text.count >= 2 && cleaned_text[cleaned_text.count - 2] == #char "m" && cleaned_text[cleaned_text.count - 1] == #char "s" {
+                        cleaned_text.count -= 2;
+                    }
+                    parsed_milliseconds, parse_success := string_to_float(cleaned_text);
+                    if parse_success {
+                        synthesizer_configuration.portamento_milliseconds = parsed_milliseconds;
+                        synthesizer_configuration.is_monophonic = true;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, glide_token.location, sprint("Invalid glide or portamento format '%'", glide_token.string_value));
+                        return false;
+                    }
+                }
+            } else if glide_token.type == .IDENTIFIER {
+                sync_success, numerator, denominator, is_triplet := parse_tempo_sync_string(glide_token.text);
+                if sync_success {
+                    synthesizer_configuration.is_portamento_tempo_synced = true;
+                    synthesizer_configuration.portamento_tempo_sync_numerator = numerator;
+                    synthesizer_configuration.portamento_tempo_sync_denominator = denominator;
+                    synthesizer_configuration.is_portamento_triplet = is_triplet;
+                    synthesizer_configuration.is_monophonic = true;
+                    advance_token(parser);
+                } else {
+                    set_error(parser, glide_token.location, sprint("Invalid glide tempo sync format '%'", glide_token.text));
+                    return false;
+                }
+            } else if glide_token.type == .INTEGER || glide_token.type == .FLOAT {
+                number_value, number_success := parse_number(parser);
+                if !number_success return false;
+
+                if current_token(parser).type == .SLASH {
+                    advance_token(parser);
+                    denominator_token, denominator_success := consume_token(parser, .INTEGER, "Expected denominator after '/' in glide tempo sync");
+                    if !denominator_success return false;
+
+                    synthesizer_configuration.is_portamento_tempo_synced = true;
+                    synthesizer_configuration.portamento_tempo_sync_numerator = cast(s32) number_value;
+                    synthesizer_configuration.portamento_tempo_sync_denominator = cast(s32) denominator_token.integer_value;
+                    synthesizer_configuration.is_portamento_triplet = false;
+                    synthesizer_configuration.is_monophonic = true;
+                } else {
+                    synthesizer_configuration.portamento_milliseconds = cast(float) number_value;
+                    synthesizer_configuration.is_monophonic = true;
+                    if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "ms" || current_token(parser).text == "s") {
+                        if current_token(parser).text == "s" {
+                            synthesizer_configuration.portamento_milliseconds *= 1000.0;
+                        }
+                        advance_token(parser);
+                    }
+                }
+            } else {
+                set_error(parser, glide_token.location, "Expected number or sync string for glide");
+                return false;
+            }
+        } else if parameter_name == "mono" || parameter_name == "monophonic" {
+            token := current_token(parser);
+            text_value := ifx token.type == .STRING then token.string_value else token.text;
+            if text_value == "on" || text_value == "true" || text_value == "yes" {
+                synthesizer_configuration.is_monophonic = true;
+                advance_token(parser);
+            } else if text_value == "off" || text_value == "false" || text_value == "no" {
+                synthesizer_configuration.is_monophonic = false;
+                advance_token(parser);
+            } else {
+                set_error(parser, token.location, sprint("Expected 'on' or 'off' for mono, got '%'", text_value));
+                return false;
+            }
+        } else if parameter_name == "polyphony" || parameter_name == "voices" {
+            number_value, number_success := parse_number(parser);
+            if !number_success return false;
+            voice_count := cast(s32) number_value;
+            if voice_count <= 1 {
+                synthesizer_configuration.is_monophonic = true;
+            } else {
+                synthesizer_configuration.is_monophonic = false;
+            }
+        } else if parameter_name == "legato" {
+            token := current_token(parser);
+            text_value := ifx token.type == .STRING then token.string_value else token.text;
+            if text_value == "on" || text_value == "true" || text_value == "yes" {
+                synthesizer_configuration.legato = true;
+                advance_token(parser);
+            } else if text_value == "off" || text_value == "false" || text_value == "no" {
+                synthesizer_configuration.legato = false;
+                advance_token(parser);
+            } else {
+                set_error(parser, token.location, sprint("Expected 'on' or 'off' for legato, got '%'", text_value));
+                return false;
+            }
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown synthesizer parameter '%'", parameter_name));
             return false;
         }
+
     }
 
     return true;

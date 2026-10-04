@@ -405,7 +405,15 @@ Synthesizer_Configuration :: struct {
     lfo_1: LFO_Configuration;
     lfo_2: LFO_Configuration;
     gain: float = 1.0;
+    is_monophonic: bool = false;
+    portamento_milliseconds: float = 0.0;
+    is_portamento_tempo_synced: bool = false;
+    portamento_tempo_sync_numerator: s32 = 1;
+    portamento_tempo_sync_denominator: s32 = 16;
+    is_portamento_triplet: bool = false;
+    legato: bool = true;
 }
+
 
 Instrument_Definition :: struct {
     name: string;

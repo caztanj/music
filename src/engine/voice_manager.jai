@@ -12,6 +12,24 @@ initialize_voice_manager :: (voice_manager: *Voice_Manager, sample_rate: s64 = D
 }
 
 trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, configuration: Synthesizer_Configuration, midi_note_number: s32, velocity: float = 1.0) -> *Voice_Slot {
+    if configuration.is_monophonic {
+        voice_index := 0;
+        while voice_index < MAXIMUM_VOICES {
+            slot := *voice_manager.voices[voice_index];
+            if slot.kind == .SYNTHESIZER && slot.instrument_name == instrument_name && is_synthesizer_voice_active(*slot.synthesizer_voice) {
+                slot.midi_note_number = midi_note_number;
+                slot.velocity = velocity;
+                slot.age_samples = 0;
+                slot.mixer_track_index = mixer_track_index;
+                trigger_synthesizer_note_glide(*slot.synthesizer_voice, midi_note_number, velocity);
+
+                return slot;
+            }
+
+            voice_index += 1;
+        }
+    }
+
     slot := find_available_voice_slot(voice_manager);
     slot.kind = .SYNTHESIZER;
     slot.instrument_name = instrument_name;
@@ -25,6 +43,7 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
 
     return slot;
 }
+
 
 trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0) -> *Voice_Slot {
     slot := find_available_voice_slot(voice_manager);

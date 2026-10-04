@@ -86,9 +86,9 @@
   - [x] Configurable 16th-note swing amount (50% = straight, 58% = subtle groove, 66% = hard triplet swing, up to 75%).
   - [x] Global and per-pattern swing settings.
 
-- [ ] **13.2 Portamento / Monophonic Glide**
-  - [ ] Smooth exponential pitch glide between overlapping notes in monophonic synth modes.
-  - [ ] Configurable glide time in milliseconds or tempo-synced beats (ideal for 808 bass glides and lead melodies).
+- [x] **13.2 Portamento / Monophonic Glide**
+  - [x] Smooth exponential pitch glide between overlapping notes in monophonic synth modes.
+  - [x] Configurable glide time in milliseconds or tempo-synced beats (ideal for 808 bass glides and lead melodies).
 - [ ] **13.3 Triplets & Micro-timing Subdivisions**
   - [ ] Support for 8th, 16th, and 32nd note triplets in step grids and piano rolls (e.g. `t1`, `t2`, `t3`).
   - [ ] Micro-step tick offsets for humanized timing and strumming emulation.

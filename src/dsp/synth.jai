@@ -5,6 +5,9 @@ initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synth
     voice.is_active = false;
     voice.oscillator_phase = 0.0;
     voice.oscillator_2_phase = 0.0;
+    voice.frequency_hertz = 440.0;
+    voice.target_frequency_hertz = 440.0;
+    voice.glide_rate = 1.0;
     voice.noise_seed = 1234567;
     voice.lfo_1_phase = 0.0;
     voice.lfo_2_phase = 0.0;
@@ -33,7 +36,10 @@ initialize_synthesizer_voice :: (voice: *Synthesizer_Voice, configuration: Synth
 
 trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32, velocity: float = 1.0) {
     voice.midi_note_number = midi_note_number;
-    voice.frequency_hertz = midi_to_hertz(midi_note_number);
+    target_frequency := midi_to_hertz(midi_note_number);
+    voice.frequency_hertz = target_frequency;
+    voice.target_frequency_hertz = target_frequency;
+    voice.glide_rate = 1.0;
     voice.velocity = velocity;
     voice.is_active = true;
     voice.noise_seed ^= cast(u32) (midi_note_number * 104729 + 19);
@@ -64,6 +70,29 @@ trigger_synthesizer_note_on :: (voice: *Synthesizer_Voice, midi_note_number: s32
     trigger_attack(*voice.amplitude_envelope);
     trigger_attack(*voice.filter_envelope);
 }
+
+trigger_synthesizer_note_glide :: (voice: *Synthesizer_Voice, midi_note_number: s32, velocity: float = 1.0) {
+    voice.midi_note_number = midi_note_number;
+    voice.velocity = velocity;
+    voice.is_active = true;
+    voice.target_frequency_hertz = midi_to_hertz(midi_note_number);
+
+    portamento_seconds := calculate_portamento_seconds(voice.configuration, voice.beats_per_minute);
+    voice.glide_rate = calculate_portamento_glide_rate(portamento_seconds, voice.sample_rate);
+
+    if voice.configuration.legato {
+        if voice.amplitude_envelope.state == .RELEASE {
+            trigger_attack(*voice.amplitude_envelope);
+        }
+        if voice.filter_envelope.state == .RELEASE {
+            trigger_attack(*voice.filter_envelope);
+        }
+    } else {
+        trigger_attack(*voice.amplitude_envelope);
+        trigger_attack(*voice.filter_envelope);
+    }
+}
+
 
 trigger_synthesizer_note_off :: (voice: *Synthesizer_Voice) {
     trigger_release(*voice.amplitude_envelope);
@@ -140,7 +169,18 @@ render_synthesizer_frame :: (voice: *Synthesizer_Voice) -> float, float {
         return 0.0, 0.0;
     }
 
+    if voice.frequency_hertz != voice.target_frequency_hertz {
+        frequency_difference := voice.target_frequency_hertz - voice.frequency_hertz;
+        if abs(frequency_difference) < 0.2 {
+            voice.frequency_hertz = voice.target_frequency_hertz;
+        } else {
+            voice.frequency_hertz += frequency_difference * voice.glide_rate;
+        }
+    }
+
+
     envelope_level := process_envelope_sample(*voice.amplitude_envelope);
+
     if !is_envelope_active(*voice.amplitude_envelope) {
         voice.is_active = false;
 
@@ -698,6 +738,56 @@ generate_lfo_sample :: (waveform: LFO_Waveform, phase: float64, random_value: fl
     }
 }
 
+calculate_portamento_seconds :: (configuration: Synthesizer_Configuration, beats_per_minute: float) -> float {
+    if configuration.is_portamento_tempo_synced {
+        effective_beats_per_minute := beats_per_minute;
+        if effective_beats_per_minute <= 0.0 {
+            effective_beats_per_minute = 120.0;
+        }
+
+        numerator := cast(float64) configuration.portamento_tempo_sync_numerator;
+        denominator := cast(float64) configuration.portamento_tempo_sync_denominator;
+        if denominator <= 0.0 {
+            denominator = 16.0;
+        }
+
+        if numerator <= 0.0 {
+            numerator = 1.0;
+        }
+
+        triplet_multiplier := ifx configuration.is_portamento_triplet then (2.0 / 3.0) else 1.0;
+        duration_in_beats := (numerator / denominator) * 4.0 * triplet_multiplier;
+        seconds_per_beat := 60.0 / cast(float64) effective_beats_per_minute;
+        portamento_seconds := cast(float) (duration_in_beats * seconds_per_beat);
+
+        return portamento_seconds;
+    }
+
+    portamento_seconds := configuration.portamento_milliseconds / 1000.0;
+
+    return portamento_seconds;
+}
+
+calculate_portamento_glide_rate :: (portamento_seconds: float, sample_rate: s64) -> float {
+    if portamento_seconds <= 0.0001 || sample_rate <= 0 {
+        return 1.0;
+    }
+
+    total_samples := cast(float64) portamento_seconds * cast(float64) sample_rate;
+    if total_samples < 1.0 {
+        return 1.0;
+    }
+
+    glide_rate := cast(float) (1.0 - exp(-4.60517 / total_samples));
+    if glide_rate > 1.0 {
+        glide_rate = 1.0;
+    } else if glide_rate < 0.000001 {
+        glide_rate = 0.000001;
+    }
+
+    return glide_rate;
+}
+
 MAXIMUM_UNISON_VOICES :: 8;
 
 Biquad_Coefficients :: struct {
@@ -715,10 +805,13 @@ Synthesizer_Voice :: struct {
     unison_phases: [MAXIMUM_UNISON_VOICES] float64;
     unison_oscillator_2_phases: [MAXIMUM_UNISON_VOICES] float64;
     frequency_hertz: float = 440.0;
+    target_frequency_hertz: float = 440.0;
+    glide_rate: float = 1.0;
     midi_note_number: s32 = 60;
     velocity: float = 1.0;
     amplitude_envelope: Envelope_Generator;
     filter_envelope: Envelope_Generator;
+
     lfo_1_phase: float64 = 0.0;
     lfo_2_phase: float64 = 0.0;
     lfo_1_random_value: float = 0.0;
