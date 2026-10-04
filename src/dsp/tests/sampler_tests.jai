@@ -196,4 +196,111 @@ sampler_tests :: () {
         trigger_sampler_note_off(*voice);
         expect_true(!is_sampler_voice_active(*voice));
     });
+
+    test("sampler_start_offset_slicing", () {
+        raw_samples := NewArray(1000, float);
+        sample_index := 0;
+        while sample_index < raw_samples.count {
+            raw_samples[sample_index] = cast(float) sample_index;
+            sample_index += 1;
+        }
+
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        frame_config: Sampler_Configuration;
+        frame_config.start_offset_frame = 30;
+        calculated_frame_offset := calculate_sampler_start_offset_frame(frame_config, *buffer);
+        expect_equals(calculated_frame_offset, 30);
+
+        ms_config: Sampler_Configuration;
+        ms_config.start_offset_is_milliseconds = true;
+        ms_config.start_offset_milliseconds = 10.0;
+        calculated_ms_offset := calculate_sampler_start_offset_frame(ms_config, *buffer);
+        expect_equals(calculated_ms_offset, 441);
+
+        percent_config: Sampler_Configuration;
+        percent_config.start_offset_is_percentage = true;
+        percent_config.start_offset_percentage = 0.5;
+        calculated_percent_offset := calculate_sampler_start_offset_frame(percent_config, *buffer);
+        expect_equals(calculated_percent_offset, 500);
+
+        voice: Sampler_Voice;
+        initialize_sampler_voice(*voice, 44100);
+        trigger_sampler_note_on(
+            *voice,
+            *buffer,
+            60,
+            1.0,
+            is_one_shot = true,
+            gain = 1.0,
+            choke_group = 0,
+            start_offset_frame = 25
+        );
+
+        first_sample := render_sampler_sample(*voice);
+        expect_near(first_sample, 25.0, 0.001);
+
+        second_sample := render_sampler_sample(*voice);
+        expect_near(second_sample, 26.0, 0.001);
+    });
+
+    test("sampler_reverse_playback", () {
+        raw_samples := NewArray(10, float);
+        sample_index := 0;
+        while sample_index < raw_samples.count {
+            raw_samples[sample_index] = cast(float) sample_index;
+            sample_index += 1;
+        }
+
+        buffer := create_audio_sample_buffer(raw_samples, 1, 44100, 60);
+
+        voice: Sampler_Voice;
+        initialize_sampler_voice(*voice, 44100);
+        trigger_sampler_note_on(
+            *voice,
+            *buffer,
+            60,
+            1.0,
+            is_one_shot = true,
+            gain = 1.0,
+            choke_group = 0,
+            is_reversed = true
+        );
+
+        expect_true(is_sampler_voice_active(*voice));
+        expect_near(cast(float) voice.playhead_frame, 9.0, 0.001);
+
+        first_sample := render_sampler_sample(*voice);
+        expect_near(first_sample, 9.0, 0.001);
+
+        second_sample := render_sampler_sample(*voice);
+        expect_near(second_sample, 8.0, 0.001);
+
+        render_counter := 0;
+        while render_counter < 8 {
+            render_sampler_sample(*voice);
+            render_counter += 1;
+        }
+
+        expect_true(!is_sampler_voice_active(*voice));
+
+        initialize_sampler_voice(*voice, 44100);
+        trigger_sampler_note_on(
+            *voice,
+            *buffer,
+            60,
+            1.0,
+            is_one_shot = true,
+            gain = 1.0,
+            choke_group = 0,
+            start_offset_frame = 2,
+            is_reversed = true
+        );
+
+        first_offset_sample := render_sampler_sample(*voice);
+        expect_near(first_offset_sample, 7.0, 0.001);
+
+        second_offset_sample := render_sampler_sample(*voice);
+        expect_near(second_offset_sample, 6.0, 0.001);
+    });
 }

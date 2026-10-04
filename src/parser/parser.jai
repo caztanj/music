@@ -375,6 +375,42 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
             continue;
         }
 
+        if parameter_name == "reverse" || parameter_name == "reversed" {
+            if current_token(parser).type == .EQUALS {
+                advance_token(parser);
+                value_token := current_token(parser);
+                if value_token.type == .IDENTIFIER {
+                    if value_token.text == "on" || value_token.text == "true" || value_token.text == "yes" {
+                        sampler_configuration.is_reversed = true;
+                        advance_token(parser);
+                    } else if value_token.text == "off" || value_token.text == "false" || value_token.text == "no" {
+                        sampler_configuration.is_reversed = false;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, value_token.location, sprint("Expected boolean for reverse, got '%'", value_token.text));
+                        return false;
+                    }
+                } else if value_token.type == .INTEGER {
+                    if value_token.integer_value == 1 {
+                        sampler_configuration.is_reversed = true;
+                        advance_token(parser);
+                    } else if value_token.integer_value == 0 {
+                        sampler_configuration.is_reversed = false;
+                        advance_token(parser);
+                    } else {
+                        set_error(parser, value_token.location, "Expected 0 or 1 for reverse");
+                        return false;
+                    }
+                } else {
+                    set_error(parser, value_token.location, "Expected boolean for reverse");
+                    return false;
+                }
+            } else {
+                sampler_configuration.is_reversed = true;
+            }
+            continue;
+        }
+
         equals_token, equals_success := consume_token(parser, .EQUALS, "Expected '=' after parameter name");
         if !equals_success return false;
 
@@ -473,6 +509,34 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
             if !loop_end_ok return false;
             sampler_configuration.loop_end_frame = cast(s64) loop_end_val;
             sampler_configuration.is_looping = true;
+        } else if parameter_name == "offset" || parameter_name == "start_offset" || parameter_name == "start" || parameter_name == "start_frame" || parameter_name == "start_offset_frame" {
+            offset_value, offset_success := parse_number(parser);
+            if !offset_success return false;
+
+            if current_token(parser).type == .PERCENT {
+                advance_token(parser);
+                sampler_configuration.start_offset_is_percentage = true;
+                sampler_configuration.start_offset_percentage = cast(float) (offset_value / 100.0);
+            } else if current_token(parser).type == .IDENTIFIER && (current_token(parser).text == "ms" || current_token(parser).text == "s") {
+                time_value := cast(float) offset_value;
+                if current_token(parser).text == "s" time_value *= 1000.0;
+                advance_token(parser);
+                sampler_configuration.start_offset_is_milliseconds = true;
+                sampler_configuration.start_offset_milliseconds = time_value;
+            } else if offset_value > 0.0 && offset_value < 1.0 {
+                sampler_configuration.start_offset_is_percentage = true;
+                sampler_configuration.start_offset_percentage = cast(float) offset_value;
+            } else {
+                sampler_configuration.start_offset_frame = cast(s64) offset_value;
+            }
+        } else if parameter_name == "start_ms" || parameter_name == "offset_ms" || parameter_name == "start_offset_ms" {
+            offset_value, offset_success := parse_number(parser);
+            if !offset_success return false;
+            sampler_configuration.start_offset_is_milliseconds = true;
+            sampler_configuration.start_offset_milliseconds = cast(float) offset_value;
+            if current_token(parser).type == .IDENTIFIER && current_token(parser).text == "ms" {
+                advance_token(parser);
+            }
         } else {
             set_error(parser, argument_token.location, sprint("Unknown sampler parameter '%'", parameter_name));
             return false;

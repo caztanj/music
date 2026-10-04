@@ -458,6 +458,12 @@ Sampler_Configuration :: struct {
     is_looping: bool = false;
     loop_start_frame: s64 = 0;
     loop_end_frame: s64 = 0;
+    start_offset_frame: s64 = 0;
+    start_offset_milliseconds: float = 0.0;
+    start_offset_is_milliseconds: bool = false;
+    start_offset_percentage: float = 0.0;
+    start_offset_is_percentage: bool = false;
+    is_reversed: bool = false;
 }
 
 Synthesizer_Configuration :: struct {

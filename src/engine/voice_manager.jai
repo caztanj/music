@@ -79,6 +79,7 @@ trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string,
     slot.age_samples = 0;
 
     is_one_shot := !configuration.is_looping && !configuration.has_envelope;
+    start_offset_frame := calculate_sampler_start_offset_frame(configuration, buffer);
 
     initialize_sampler_voice(*slot.sampler_voice, voice_manager.sample_rate);
     trigger_sampler_note_on(
@@ -93,7 +94,9 @@ trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string,
         has_envelope = configuration.has_envelope,
         is_looping = configuration.is_looping,
         loop_start_frame = configuration.loop_start_frame,
-        loop_end_frame = configuration.loop_end_frame
+        loop_end_frame = configuration.loop_end_frame,
+        start_offset_frame = start_offset_frame,
+        is_reversed = configuration.is_reversed
     );
 
     return slot;

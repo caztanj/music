@@ -109,9 +109,9 @@
 - [x] **14.2 Sampler ADSR & Volume Envelopes**
   - [x] Per-sample Attack and Decay envelopes to reshape transient punch or eliminate clicks.
   - [x] Sustained sample loops with loop start / loop end markers.
-- [ ] **14.3 Sample Manipulation Parameters**
-  - [ ] Sample start offset (skip silent intros or slice sample attacks).
-  - [ ] Reverse playback flag (for reverse cymbals, snare swells, and transitional risers).
+- [x] **14.3 Sample Manipulation Parameters**
+  - [x] Sample start offset (skip silent intros or slice sample attacks).
+  - [x] Reverse playback flag (for reverse cymbals, snare swells, and transitional risers).
 - [ ] **14.4 Multi-Sample Pitch Tracking**
   - [ ] Root note assignment and linear/cubic pitch interpolation across octaves for realistic acoustic or piano playback.
 

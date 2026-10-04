@@ -514,5 +514,59 @@ END;
         expect_equals(pad.sampler.loop_start_frame, 1000);
         expect_equals(pad.sampler.loop_end_frame, 20000);
     });
+
+    test("sampler_reverse_and_offset_parameters_parsing", () {
+        song_text := #string END
+[project]
+name = "Sampler Reverse and Offset Test"
+bpm = 120
+time_signature = 4/4
+bars = 1
+
+[instruments]
+reverse_cymbal = sampler("samples/cymbal.wav", reverse)
+snare_swell = sampler("samples/snare.wav", reverse = on, start = 50ms)
+sliced_break = sampler("samples/break.wav", offset = 22050)
+perc_hit = sampler("samples/perc.wav", offset = 50%)
+
+[pattern main]
+reverse_cymbal | x . . . |
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+reverse_cymbal -> track 1
+snare_swell -> track 1
+sliced_break -> track 1
+perc_hit -> track 1
+
+[arrangement]
+bar 1: main
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "sampler_reverse_offset.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        reverse_cymbal, cymbal_found := find_instrument(*song_specification, "reverse_cymbal");
+        expect_true(cymbal_found);
+        expect_true(reverse_cymbal.sampler.is_reversed);
+
+        snare_swell, swell_found := find_instrument(*song_specification, "snare_swell");
+        expect_true(swell_found);
+        expect_true(snare_swell.sampler.is_reversed);
+        expect_true(snare_swell.sampler.start_offset_is_milliseconds);
+        expect_near(snare_swell.sampler.start_offset_milliseconds, 50.0, 0.001);
+
+        sliced_break, break_found := find_instrument(*song_specification, "sliced_break");
+        expect_true(break_found);
+        expect_equals(sliced_break.sampler.start_offset_frame, 22050);
+
+        perc_hit, perc_found := find_instrument(*song_specification, "perc_hit");
+        expect_true(perc_found);
+        expect_true(perc_hit.sampler.start_offset_is_percentage);
+        expect_near(perc_hit.sampler.start_offset_percentage, 0.5, 0.001);
+    });
 }
 

@@ -135,12 +135,13 @@ initialize_sampler_voice :: (voice: *Sampler_Voice, sample_rate: s64 = DEFAULT_S
     voice.is_looping = false;
     voice.loop_start_frame = 0;
     voice.loop_end_frame = 0;
+    voice.start_offset_frame = 0;
+    voice.is_reversed = false;
     reset_envelope(*voice.envelope);
 }
 
-trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0, envelope_configuration: Envelope_Configuration = .{}, has_envelope: bool = false, is_looping: bool = false, loop_start_frame: s64 = 0, loop_end_frame: s64 = 0) {
+trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0, envelope_configuration: Envelope_Configuration = .{}, has_envelope: bool = false, is_looping: bool = false, loop_start_frame: s64 = 0, loop_end_frame: s64 = 0, start_offset_frame: s64 = 0, is_reversed: bool = false) {
     voice.buffer = buffer;
-    voice.playhead_frame = 0.0;
     voice.velocity = velocity;
     voice.gain = gain;
     voice.is_one_shot = is_one_shot;
@@ -150,6 +151,25 @@ trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer,
     voice.is_looping = is_looping;
     voice.loop_start_frame = loop_start_frame;
     voice.loop_end_frame = loop_end_frame;
+    voice.start_offset_frame = start_offset_frame;
+    voice.is_reversed = is_reversed;
+
+    total_frames: s64 = ifx buffer != null then buffer.frame_count else 0;
+    clamped_offset := start_offset_frame;
+    if clamped_offset < 0 clamped_offset = 0;
+    if total_frames > 0 && clamped_offset >= total_frames clamped_offset = total_frames - 1;
+
+    if is_reversed {
+        end_boundary := total_frames;
+        if is_looping && loop_end_frame > 0 && loop_end_frame <= total_frames {
+            end_boundary = loop_end_frame;
+        }
+        starting_frame := (end_boundary - 1) - clamped_offset;
+        if starting_frame < 0 starting_frame = 0;
+        voice.playhead_frame = cast(float64) starting_frame;
+    } else {
+        voice.playhead_frame = cast(float64) clamped_offset;
+    }
 
     if buffer != null && buffer.sample_rate > 0 && voice.sample_rate > 0 {
         semitone_difference := cast(float64) (midi_note_number - buffer.root_midi_note);
@@ -185,6 +205,8 @@ reset_sampler_voice :: (voice: *Sampler_Voice) {
     voice.is_looping = false;
     voice.loop_start_frame = 0;
     voice.loop_end_frame = 0;
+    voice.start_offset_frame = 0;
+    voice.is_reversed = false;
     reset_envelope(*voice.envelope);
 }
 
@@ -222,14 +244,28 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
 
     if voice.is_looping && effective_loop_end > effective_loop_start {
         loop_length := effective_loop_end - effective_loop_start;
-        while voice.playhead_frame >= cast(float64) effective_loop_end {
-            voice.playhead_frame -= cast(float64) loop_length;
+        if voice.is_reversed {
+            while voice.playhead_frame < cast(float64) effective_loop_start {
+                voice.playhead_frame += cast(float64) loop_length;
+            }
+        } else {
+            while voice.playhead_frame >= cast(float64) effective_loop_end {
+                voice.playhead_frame -= cast(float64) loop_length;
+            }
         }
     } else {
-        if voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
-            voice.is_active = false;
+        if voice.is_reversed {
+            if voice.playhead_frame < 0.0 {
+                voice.is_active = false;
 
-            return 0.0, 0.0;
+                return 0.0, 0.0;
+            }
+        } else {
+            if voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
+                voice.is_active = false;
+
+                return 0.0, 0.0;
+            }
         }
     }
 
@@ -273,9 +309,16 @@ render_sampler_frame :: (voice: *Sampler_Voice) -> float, float {
     output_left := interpolated_left * voice.velocity * voice.gain * envelope_factor;
     output_right := interpolated_right * voice.velocity * voice.gain * envelope_factor;
 
-    voice.playhead_frame += voice.playback_speed;
-    if !voice.is_looping && voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
-        voice.is_active = false;
+    if voice.is_reversed {
+        voice.playhead_frame -= voice.playback_speed;
+        if !voice.is_looping && voice.playhead_frame < 0.0 {
+            voice.is_active = false;
+        }
+    } else {
+        voice.playhead_frame += voice.playback_speed;
+        if !voice.is_looping && voice.playhead_frame >= cast(float64) voice.buffer.frame_count {
+            voice.is_active = false;
+        }
     }
 
     return output_left, output_right;
@@ -299,6 +342,35 @@ render_sampler_block_interleaved :: (voice: *Sampler_Voice, output_buffer: [] fl
         output_buffer[sample_index + 1] += right;
         sample_index += 2;
     }
+}
+
+calculate_sampler_start_offset_frame :: (configuration: Sampler_Configuration, buffer: *Audio_Sample_Buffer) -> s64 {
+    if buffer == null || buffer.frame_count <= 0 {
+        return 0;
+    }
+
+    if configuration.start_offset_is_percentage {
+        offset := cast(s64) (configuration.start_offset_percentage * cast(float) buffer.frame_count);
+        if offset < 0 offset = 0;
+        if offset >= buffer.frame_count offset = buffer.frame_count - 1;
+
+        return offset;
+    }
+
+    if configuration.start_offset_is_milliseconds {
+        seconds := configuration.start_offset_milliseconds / 1000.0;
+        offset := cast(s64) (seconds * cast(float) buffer.sample_rate);
+        if offset < 0 offset = 0;
+        if offset >= buffer.frame_count offset = buffer.frame_count - 1;
+
+        return offset;
+    }
+
+    offset := configuration.start_offset_frame;
+    if offset < 0 offset = 0;
+    if offset >= buffer.frame_count offset = buffer.frame_count - 1;
+
+    return offset;
 }
 
 Audio_Sample_Buffer :: struct {
@@ -325,4 +397,6 @@ Sampler_Voice :: struct {
     is_looping: bool = false;
     loop_start_frame: s64 = 0;
     loop_end_frame: s64 = 0;
+    start_offset_frame: s64 = 0;
+    is_reversed: bool = false;
 }
