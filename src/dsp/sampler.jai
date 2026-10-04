@@ -130,15 +130,17 @@ initialize_sampler_voice :: (voice: *Sampler_Voice, sample_rate: s64 = DEFAULT_S
     voice.is_active = false;
     voice.is_one_shot = true;
     voice.sample_rate = sample_rate;
+    voice.choke_group = 0;
 }
 
-trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0) {
+trigger_sampler_note_on :: (voice: *Sampler_Voice, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0) {
     voice.buffer = buffer;
     voice.playhead_frame = 0.0;
     voice.velocity = velocity;
     voice.gain = gain;
     voice.is_one_shot = is_one_shot;
     voice.is_active = true;
+    voice.choke_group = choke_group;
 
     if buffer != null && buffer.sample_rate > 0 && voice.sample_rate > 0 {
         semitone_difference := cast(float64) (midi_note_number - buffer.root_midi_note);
@@ -160,6 +162,7 @@ reset_sampler_voice :: (voice: *Sampler_Voice) {
     voice.is_active = false;
     voice.playhead_frame = 0.0;
     voice.buffer = null;
+    voice.choke_group = 0;
 }
 
 is_sampler_voice_active :: (voice: *Sampler_Voice) -> bool {
@@ -244,4 +247,5 @@ Sampler_Voice :: struct {
     is_active: bool = false;
     is_one_shot: bool = true;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
+    choke_group: s32 = 0;
 }

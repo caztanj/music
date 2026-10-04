@@ -606,7 +606,7 @@ dispatch_sequencer_event :: (event: *Sequencer_Event, song_specification: *Song_
                         if sample_pool != null {
                             buffer, buffer_found := find_sample_in_pool(sample_pool, event.instrument_name);
                             if buffer_found {
-                                trigger_sampler_note(voice_manager, event.instrument_name, event.mixer_track_index, buffer, event.midi_note_number, event.velocity, is_one_shot = true, gain = instrument.sampler.gain);
+                                trigger_sampler_note(voice_manager, event.instrument_name, event.mixer_track_index, buffer, event.midi_note_number, event.velocity, is_one_shot = true, gain = instrument.sampler.gain, choke_group = instrument.sampler.choke_group);
                             }
                         }
 

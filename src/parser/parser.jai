@@ -379,6 +379,25 @@ parse_sampler_arguments :: (parser: *Parser, sampler_configuration: *Sampler_Con
                 set_error(parser, root_token.location, "Expected note name or MIDI note number for root");
                 return false;
             }
+        } else if parameter_name == "choke" || parameter_name == "choke_group" || parameter_name == "group" {
+            token := current_token(parser);
+            if token.type == .INTEGER {
+                sampler_configuration.choke_group = cast(s32) token.integer_value;
+                advance_token(parser);
+            } else if token.type == .IDENTIFIER || token.type == .STRING {
+                name_string := ifx token.type == .STRING then token.string_value else token.text;
+                hash_value: u32 = 5381;
+                byte_index := 0;
+                while byte_index < name_string.count {
+                    hash_value = ((hash_value << 5) + hash_value) + cast(u32) name_string[byte_index];
+                    byte_index += 1;
+                }
+                sampler_configuration.choke_group = cast(s32) ((hash_value % 10000) + 1);
+                advance_token(parser);
+            } else {
+                set_error(parser, token.location, "Expected integer or identifier for choke group");
+                return false;
+            }
         } else {
             set_error(parser, argument_token.location, sprint("Unknown sampler parameter '%'", parameter_name));
             return false;
@@ -761,6 +780,25 @@ parse_synthesizer_arguments :: (parser: *Parser, synthesizer_configuration: *Syn
                 amp_vel /= 100.0;
             }
             synthesizer_configuration.velocity_to_gain = amp_vel;
+        } else if parameter_name == "choke" || parameter_name == "choke_group" || parameter_name == "group" {
+            token := current_token(parser);
+            if token.type == .INTEGER {
+                synthesizer_configuration.choke_group = cast(s32) token.integer_value;
+                advance_token(parser);
+            } else if token.type == .IDENTIFIER || token.type == .STRING {
+                name_string := ifx token.type == .STRING then token.string_value else token.text;
+                hash_value: u32 = 5381;
+                byte_index := 0;
+                while byte_index < name_string.count {
+                    hash_value = ((hash_value << 5) + hash_value) + cast(u32) name_string[byte_index];
+                    byte_index += 1;
+                }
+                synthesizer_configuration.choke_group = cast(s32) ((hash_value % 10000) + 1);
+                advance_token(parser);
+            } else {
+                set_error(parser, token.location, "Expected integer or identifier for choke group");
+                return false;
+            }
         } else {
             set_error(parser, parameter_token.location, sprint("Unknown synthesizer parameter '%'", parameter_name));
             return false;

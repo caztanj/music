@@ -104,8 +104,8 @@
 
 > **Goal**: Turn the sampler into a full-featured drum and instrument playback workstation.
 
-- [ ] **14.1 Choke Groups (`src/dsp/sampler.jai`, `src/engine/voice_manager.jai`)**
-  - [ ] Exclusive voice groups (e.g. Choke Group 1: Closed Hi-Hat instantly cuts off ringing Open Hi-Hat).
+- [x] **14.1 Choke Groups (`src/dsp/sampler.jai`, `src/engine/voice_manager.jai`)**
+  - [x] Exclusive voice groups (e.g. Choke Group 1: Closed Hi-Hat instantly cuts off ringing Open Hi-Hat).
 - [ ] **14.2 Sampler ADSR & Volume Envelopes**
   - [ ] Per-sample Attack and Decay envelopes to reshape transient punch or eliminate clicks.
   - [ ] Sustained sample loops with loop start / loop end markers.

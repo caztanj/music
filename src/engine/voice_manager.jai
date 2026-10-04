@@ -11,7 +11,24 @@ initialize_voice_manager :: (voice_manager: *Voice_Manager, sample_rate: s64 = D
     }
 }
 
+choke_voices_in_group :: (voice_manager: *Voice_Manager, choke_group: s32) {
+    if choke_group <= 0 return;
+
+    voice_index := 0;
+    while voice_index < MAXIMUM_VOICES {
+        slot := *voice_manager.voices[voice_index];
+        if slot.kind != .INACTIVE && slot.choke_group == choke_group && is_voice_active(slot) {
+            reset_voice_slot(slot);
+        }
+        voice_index += 1;
+    }
+}
+
 trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, configuration: Synthesizer_Configuration, midi_note_number: s32, velocity: float = 1.0) -> *Voice_Slot {
+    if configuration.choke_group > 0 {
+        choke_voices_in_group(voice_manager, configuration.choke_group);
+    }
+
     if configuration.is_monophonic {
         voice_index := 0;
         while voice_index < MAXIMUM_VOICES {
@@ -19,6 +36,7 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
             if slot.kind == .SYNTHESIZER && slot.instrument_name == instrument_name && is_synthesizer_voice_active(*slot.synthesizer_voice) {
                 slot.midi_note_number = midi_note_number;
                 slot.velocity = velocity;
+                slot.choke_group = configuration.choke_group;
                 slot.age_samples = 0;
                 slot.mixer_track_index = mixer_track_index;
                 trigger_synthesizer_note_glide(*slot.synthesizer_voice, midi_note_number, velocity);
@@ -36,6 +54,7 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
     slot.mixer_track_index = mixer_track_index;
     slot.midi_note_number = midi_note_number;
     slot.velocity = velocity;
+    slot.choke_group = configuration.choke_group;
     slot.age_samples = 0;
 
     initialize_synthesizer_voice(*slot.synthesizer_voice, configuration, voice_manager.sample_rate, voice_manager.beats_per_minute);
@@ -45,17 +64,22 @@ trigger_synthesizer_note :: (voice_manager: *Voice_Manager, instrument_name: str
 }
 
 
-trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0) -> *Voice_Slot {
+trigger_sampler_note :: (voice_manager: *Voice_Manager, instrument_name: string, mixer_track_index: s64, buffer: *Audio_Sample_Buffer, midi_note_number: s32 = 60, velocity: float = 1.0, is_one_shot: bool = true, gain: float = 1.0, choke_group: s32 = 0) -> *Voice_Slot {
+    if choke_group > 0 {
+        choke_voices_in_group(voice_manager, choke_group);
+    }
+
     slot := find_available_voice_slot(voice_manager);
     slot.kind = .SAMPLER;
     slot.instrument_name = instrument_name;
     slot.mixer_track_index = mixer_track_index;
     slot.midi_note_number = midi_note_number;
     slot.velocity = velocity;
+    slot.choke_group = choke_group;
     slot.age_samples = 0;
 
     initialize_sampler_voice(*slot.sampler_voice, voice_manager.sample_rate);
-    trigger_sampler_note_on(*slot.sampler_voice, buffer, midi_note_number, velocity, is_one_shot, gain);
+    trigger_sampler_note_on(*slot.sampler_voice, buffer, midi_note_number, velocity, is_one_shot, gain, choke_group);
 
     return slot;
 }
@@ -277,6 +301,7 @@ reset_voice_slot :: (slot: *Voice_Slot) {
     slot.mixer_track_index = 1;
     slot.midi_note_number = 60;
     slot.velocity = 1.0;
+    slot.choke_group = 0;
 }
 
 MAXIMUM_VOICES :: 128;
@@ -293,6 +318,7 @@ Voice_Slot :: struct {
     mixer_track_index: s64 = 1;
     midi_note_number: s32 = 60;
     velocity: float = 1.0;
+    choke_group: s32 = 0;
     age_samples: u64 = 0;
     synthesizer_voice: Synthesizer_Voice;
     sampler_voice: Sampler_Voice;

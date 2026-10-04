@@ -134,4 +134,35 @@ voice_manager_tests :: () {
         expect_equals(new_slot.midi_note_number, 80);
         expect_equals(count_active_voices(*voice_manager), MAXIMUM_VOICES);
     });
+
+    test("choke_group_cuts_off_ringing_voices_in_same_group", () {
+        voice_manager: Voice_Manager;
+        initialize_voice_manager(*voice_manager, 44100);
+
+        raw_samples := NewArray(5000, float);
+        sample_index := 0;
+        while sample_index < raw_samples.count {
+            raw_samples[sample_index] = 0.5;
+            sample_index += 1;
+        }
+
+        buffer := create_audio_sample_buffer(raw_samples, 2, 44100, 60);
+
+        open_hat_slot := trigger_sampler_note(*voice_manager, "hat_open", 1, *buffer, 60, 1.0, is_one_shot = true, gain = 1.0, choke_group = 1);
+        expect_equals(count_active_voices(*voice_manager), 1);
+        expect_equals(open_hat_slot.instrument_name, "hat_open");
+
+        left_buffer: [100] float;
+        right_buffer: [100] float;
+        render_voices_into_buffer(*voice_manager, left_buffer, right_buffer);
+        expect_equals(count_active_voices(*voice_manager), 1);
+
+        closed_hat_slot := trigger_sampler_note(*voice_manager, "hat_closed", 1, *buffer, 60, 1.0, is_one_shot = true, gain = 1.0, choke_group = 1);
+        expect_equals(count_active_voices(*voice_manager), 1);
+        expect_equals(closed_hat_slot.instrument_name, "hat_closed");
+        expect_true(!is_sampler_voice_active(*open_hat_slot.sampler_voice) || open_hat_slot == closed_hat_slot);
+
+        kick_slot := trigger_sampler_note(*voice_manager, "kick", 1, *buffer, 60, 1.0, is_one_shot = true, gain = 1.0, choke_group = 0);
+        expect_equals(count_active_voices(*voice_manager), 2);
+    });
 }

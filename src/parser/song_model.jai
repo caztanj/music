@@ -452,6 +452,7 @@ Sampler_Configuration :: struct {
     sample_file_path: string;
     gain: float = 1.0;
     root_midi_note: s32 = 60;
+    choke_group: s32 = 0;
 }
 
 Synthesizer_Configuration :: struct {
@@ -479,6 +480,7 @@ Synthesizer_Configuration :: struct {
     is_portamento_triplet: bool = false;
     legato: bool = true;
     velocity_to_gain: float = 1.0;
+    choke_group: s32 = 0;
 }
 
 

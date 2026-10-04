@@ -418,5 +418,56 @@ END;
         expect_near(melody_pattern.piano_roll_notes[5].velocity, ACCENT_NOTE_VELOCITY, 0.001);
         expect_near(melody_pattern.piano_roll_notes[6].velocity, 0.75, 0.001);
     });
+
+    test("sampler_and_synthesizer_choke_group_parsing", () {
+        song_text := #string END
+[project]
+name = "Choke Group Test"
+bpm = 120
+time_signature = 4/4
+bars = 1
+
+[instruments]
+hat_open = sampler("samples/hat_open.wav", choke = 1)
+hat_closed = sampler("samples/hat_closed.wav", choke_group = 1)
+cymbal = sampler("samples/cymbal.wav", group = "cymbals")
+lead = synth(wave="saw", choke = 2)
+
+[pattern main]
+hat_open | x . . . |
+
+[mixer]
+track 1: gain = 1.0, output = master
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+hat_open -> track 1
+hat_closed -> track 1
+cymbal -> track 1
+lead -> track 1
+
+[arrangement]
+bar 1: main
+END;
+
+        song_specification, success, error_message := parse_song(song_text, "choke.song", check_samples_on_disk = false);
+        expect_true(success);
+
+        hat_open, hat_open_found := find_instrument(*song_specification, "hat_open");
+        expect_true(hat_open_found);
+        expect_equals(hat_open.sampler.choke_group, 1);
+
+        hat_closed, hat_closed_found := find_instrument(*song_specification, "hat_closed");
+        expect_true(hat_closed_found);
+        expect_equals(hat_closed.sampler.choke_group, 1);
+
+        cymbal, cymbal_found := find_instrument(*song_specification, "cymbal");
+        expect_true(cymbal_found);
+        expect_true(cymbal.sampler.choke_group > 0);
+
+        lead, lead_found := find_instrument(*song_specification, "lead");
+        expect_true(lead_found);
+        expect_equals(lead.synthesizer.choke_group, 2);
+    });
 }
 
