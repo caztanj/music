@@ -1,0 +1,637 @@
+[project]
+name = "Pulse Reactor"
+bpm = 128
+time_signature = 4/4
+bars = 104
+
+[instruments]
+kick = sampler("samples/kick.wav", gain = 1.0)
+clap = sampler("samples/clap.wav", gain = 0.85)
+snare = sampler("samples/snare.wav", gain = 0.80)
+hihat = sampler("samples/hihat.wav", attack = 2, decay = 80, choke = 1, gain = 0.65)
+open_hat = sampler("samples/hihat.wav", attack = 3, decay = 300, choke = 1, gain = 0.70)
+riser_snare = sampler("samples/snare.wav", attack = 4, decay = 120, gain = 0.85)
+club_bass = synth(wave="saw", wave2="square", coarse2=-12, osc_mix=0.55, filter="lowpass", cutoff=650, res=0.35, attack=2, decay=130, sustain=0.25, release=60, gain=0.95)
+sub_bass = synth(wave="sine", filter="lowpass", cutoff=220, res=0.10, attack=4, decay=180, sustain=0.85, release=80, gain=0.95)
+lead = synth(wave="saw", unison=6, detune=24.0, spread=0.90, filter="lowpass", cutoff=3200, res=0.25, attack=8, decay=180, sustain=0.75, release=160, gain=0.70)
+lead_harmony = synth(wave="saw", unison=4, detune=18.0, spread=0.80, filter="lowpass", cutoff=2800, res=0.25, attack=8, decay=180, sustain=0.70, release=160, gain=0.65)
+pluck = synth(wave="square", filter="lowpass", cutoff=2000, res=0.45, attack=2, decay=90, sustain=0.15, release=70, gain=0.75)
+pad = synth(wave="saw", wave2="saw", tune2=8.0, osc_mix=0.50, filter="lowpass", cutoff=1200, res=0.18, attack=150, decay=350, sustain=0.85, release=450, gain=0.65)
+white_noise = synth(wave="white", filter="bandpass", cutoff=2500, res=0.40, attack=50, decay=200, sustain=0.80, release=250, gain=0.35)
+
+[pattern drum_kick_only]
+kick     | x . . . x . . . x . . . x . . . |
+
+[pattern drum_kick_hat]
+kick     | x . . . x . . . x . . . x . . . |
+open_hat | . . x . . . x . . . x . . . x . |
+
+[pattern drum_drop]
+kick     | x . . . x . . . x . . . x . . . |
+clap     | . . . . x . . . . . . . x . . . |
+snare    | . . . . x . . . . . . . x . . . |
+open_hat | . . x . . . x . . . x . . . x . |
+hihat    | x . x . x . x . x . x . x . x . |
+
+[pattern drum_drop_heavy]
+kick     | x . . . x . . . x . . . x . . . |
+clap     | . . . . x . . . . . . . x . . . |
+snare    | . . . . x . . . . . . . x . . . |
+open_hat | . . x . . . x . . . x . . . x . |
+hihat    | x x x x x x x x x x x x x x x x |
+
+[pattern riser_stage_1]
+snare    | x . . . x . . . x . . . x . . . |
+hihat    | x . x . x . x . x . x . x . x . |
+
+[pattern riser_stage_2]
+snare    | x . x . x . x . x . x . x . x . |
+clap     | . . . . x . . . . . . . x . . . |
+hihat    | x x x x x x x x x x x x x x x x |
+
+[pattern riser_stage_3]
+snare       | x x x x x x x x x x x x x x x x |
+riser_snare | . x . x . x . x . x . x . x . x |
+clap        | . . . . x . . . . . . . x . . . |
+
+[pattern riser_stage_4]
+snare       | x x x x x x x x x x x x . . . . |
+riser_snare | x x x x x x x x x x x x . . . . |
+clap        | x . x . x . x . x . x . . . . . |
+
+[pattern noise_sweep]
+C4 step=0 len=16 vel=0.75
+
+[pattern bass_rolling_fm]
+F1 step=0 len=1 vel=0.95
+F1 step=1 len=1 vel=0.75
+F2 step=2 len=1 vel=0.85
+F1 step=3 len=1 vel=0.75
+F1 step=4 len=1 vel=0.90
+F1 step=5 len=1 vel=0.75
+Ab2 step=6 len=1 vel=0.85
+F1 step=7 len=1 vel=0.75
+F1 step=8 len=1 vel=0.95
+F1 step=9 len=1 vel=0.75
+F2 step=10 len=1 vel=0.85
+F1 step=11 len=1 vel=0.75
+C2 step=12 len=1 vel=0.90
+Eb2 step=13 len=1 vel=0.80
+F2 step=14 len=1 vel=0.85
+F1 step=15 len=1 vel=0.75
+
+[pattern bass_rolling_db]
+Db1 step=0 len=1 vel=0.95
+Db1 step=1 len=1 vel=0.75
+Db2 step=2 len=1 vel=0.85
+Db1 step=3 len=1 vel=0.75
+Db1 step=4 len=1 vel=0.90
+Db1 step=5 len=1 vel=0.75
+F2 step=6 len=1 vel=0.85
+Db1 step=7 len=1 vel=0.75
+Db1 step=8 len=1 vel=0.95
+Db1 step=9 len=1 vel=0.75
+Db2 step=10 len=1 vel=0.85
+Db1 step=11 len=1 vel=0.75
+Ab1 step=12 len=1 vel=0.90
+C2 step=13 len=1 vel=0.80
+Db2 step=14 len=1 vel=0.85
+Db1 step=15 len=1 vel=0.75
+
+[pattern bass_rolling_ab]
+Ab0 step=0 len=1 vel=0.95
+Ab0 step=1 len=1 vel=0.75
+Ab1 step=2 len=1 vel=0.85
+Ab0 step=3 len=1 vel=0.75
+Ab0 step=4 len=1 vel=0.90
+Ab0 step=5 len=1 vel=0.75
+C2 step=6 len=1 vel=0.85
+Ab0 step=7 len=1 vel=0.75
+Ab0 step=8 len=1 vel=0.95
+Ab0 step=9 len=1 vel=0.75
+Ab1 step=10 len=1 vel=0.85
+Ab0 step=11 len=1 vel=0.75
+Eb1 step=12 len=1 vel=0.90
+G1 step=13 len=1 vel=0.80
+Ab1 step=14 len=1 vel=0.85
+Ab0 step=15 len=1 vel=0.75
+
+[pattern bass_rolling_eb]
+Eb1 step=0 len=1 vel=0.95
+Eb1 step=1 len=1 vel=0.75
+Eb2 step=2 len=1 vel=0.85
+Eb1 step=3 len=1 vel=0.75
+Eb1 step=4 len=1 vel=0.90
+Eb1 step=5 len=1 vel=0.75
+G2 step=6 len=1 vel=0.85
+Eb1 step=7 len=1 vel=0.75
+Eb1 step=8 len=1 vel=0.95
+Eb1 step=9 len=1 vel=0.75
+Eb2 step=10 len=1 vel=0.85
+Eb1 step=11 len=1 vel=0.75
+Bb1 step=12 len=1 vel=0.90
+Db2 step=13 len=1 vel=0.80
+Eb2 step=14 len=1 vel=0.85
+Eb1 step=15 len=1 vel=0.75
+
+[pattern pad_fm]
+F2 step=0 len=16 vel=0.70
+Ab2 step=0 len=16 vel=0.70
+C3 step=0 len=16 vel=0.70
+F3 step=0 len=16 vel=0.65
+
+[pattern pad_db]
+Db2 step=0 len=16 vel=0.70
+F2 step=0 len=16 vel=0.70
+Ab2 step=0 len=16 vel=0.70
+Db3 step=0 len=16 vel=0.65
+
+[pattern pad_ab]
+Ab2 step=0 len=16 vel=0.70
+C3 step=0 len=16 vel=0.70
+Eb3 step=0 len=16 vel=0.70
+Ab3 step=0 len=16 vel=0.65
+
+[pattern pad_eb]
+Eb2 step=0 len=16 vel=0.70
+G2 step=0 len=16 vel=0.70
+Bb2 step=0 len=16 vel=0.70
+Eb3 step=0 len=16 vel=0.65
+
+[pattern pluck_fm]
+F3 step=0 len=1 vel=0.85
+Ab3 step=2 len=1 vel=0.80
+C4 step=4 len=1 vel=0.85
+Eb4 step=6 len=1 vel=0.90
+C4 step=8 len=1 vel=0.80
+Ab3 step=10 len=1 vel=0.85
+F3 step=12 len=1 vel=0.80
+Ab3 step=14 len=1 vel=0.85
+
+[pattern pluck_db]
+Db3 step=0 len=1 vel=0.85
+F3 step=2 len=1 vel=0.80
+Ab3 step=4 len=1 vel=0.85
+Db4 step=6 len=1 vel=0.90
+Ab3 step=8 len=1 vel=0.80
+F3 step=10 len=1 vel=0.85
+Db3 step=12 len=1 vel=0.80
+F3 step=14 len=1 vel=0.85
+
+[pattern pluck_ab]
+Ab2 step=0 len=1 vel=0.85
+C3 step=2 len=1 vel=0.80
+Eb3 step=4 len=1 vel=0.85
+Ab3 step=6 len=1 vel=0.90
+Eb3 step=8 len=1 vel=0.80
+C3 step=10 len=1 vel=0.85
+Ab2 step=12 len=1 vel=0.80
+C3 step=14 len=1 vel=0.85
+
+[pattern pluck_eb]
+Eb3 step=0 len=1 vel=0.85
+G3 step=2 len=1 vel=0.80
+Bb3 step=4 len=1 vel=0.85
+Eb4 step=6 len=1 vel=0.90
+Bb3 step=8 len=1 vel=0.80
+G3 step=10 len=1 vel=0.85
+Eb3 step=12 len=1 vel=0.80
+G3 step=14 len=1 vel=0.85
+
+[pattern lead_hook_1]
+F4 step=0 len=3 vel=0.95
+C5 step=4 len=3 vel=0.90
+Eb5 step=8 len=4 vel=1.00
+C5 step=12 len=4 vel=0.90
+
+[pattern lead_hook_2]
+Db5 step=0 len=4 vel=0.95
+C5 step=4 len=2 vel=0.90
+Bb4 step=6 len=2 vel=0.90
+Ab4 step=8 len=4 vel=0.95
+G4 step=12 len=4 vel=0.85
+
+[pattern lead_hook_3]
+Ab4 step=0 len=3 vel=0.90
+C5 step=4 len=3 vel=0.90
+Eb5 step=8 len=4 vel=1.00
+F5 step=12 len=4 vel=1.00
+
+[pattern lead_hook_4]
+G5 step=0 len=4 vel=1.00
+F5 step=4 len=2 vel=0.95
+Eb5 step=6 len=2 vel=0.90
+C5 step=8 len=4 vel=0.95
+Bb4 step=12 len=4 vel=0.90
+
+[pattern lead_harmony_1]
+Ab4 step=0 len=3 vel=0.85
+Eb5 step=4 len=3 vel=0.80
+G5 step=8 len=4 vel=0.90
+Eb5 step=12 len=4 vel=0.85
+
+[pattern lead_harmony_2]
+F5 step=0 len=4 vel=0.85
+Eb5 step=4 len=2 vel=0.80
+Db5 step=6 len=2 vel=0.80
+C5 step=8 len=4 vel=0.85
+Bb4 step=12 len=4 vel=0.75
+
+[pattern lead_harmony_3]
+C5 step=0 len=3 vel=0.80
+Eb5 step=4 len=3 vel=0.80
+Ab5 step=8 len=4 vel=0.90
+Ab5 step=12 len=4 vel=0.90
+
+[pattern lead_harmony_4]
+Bb5 step=0 len=4 vel=0.90
+Ab5 step=4 len=2 vel=0.85
+G5 step=6 len=2 vel=0.80
+Eb5 step=8 len=4 vel=0.85
+Db5 step=12 len=4 vel=0.80
+
+[mixer]
+track 1 (drums): gain = 0.95, pan = 0.0, compressor = on, comp_threshold = -10.0, comp_ratio = 4.0, comp_attack = 4.0, comp_release = 50.0, eq_low = 2.0, eq_low_freq = 80.0, send1 = 0.20, output = master
+track 2 (bass): gain = 0.92, pan = 0.0, filter = "lowpass", cutoff = 800, res = 0.25, saturation = "cubic", drive = 1.3, sidechain = track 1, ducking_depth = 14, comp_attack = 1.5, comp_release = 90, output = master
+track 3 (lead): gain = 0.75, pan = 0.0, filter = "lowpass", cutoff = 8000, res = 0.25, sidechain = track 1, ducking_depth = 8, comp_attack = 2.0, comp_release = 90, delay = 0.375, feedback = 0.30, send1 = 0.35, output = master
+track 4 (pluck): gain = 0.72, pan = -0.15, filter = "lowpass", cutoff = 3200, res = 0.35, delay = 0.25, feedback = 0.30, chorus = 0.30, chorus_rate = 1.1, send1 = 0.25, output = master
+track 5 (pad): gain = 0.68, pan = 0.15, filter = "lowpass", cutoff = 2000, res = 0.15, chorus = 0.45, chorus_rate = 0.6, sidechain = track 1, ducking_depth = 10, send1 = 0.50, output = master
+track 6 (fx): gain = 0.65, pan = 0.0, filter = "bandpass", cutoff = 3000, res = 0.40, delay = 0.25, feedback = 0.40, send1 = 0.60, output = master
+aux 1 (reverb): gain = 0.85, reverb = 0.85, reverb_room = 0.85, reverb_damp = 0.25, reverb_predelay = 15.0
+master: gain = 1.0, limiter = on
+
+[channel_routing]
+kick -> track 1
+clap -> track 1
+snare -> track 1
+hihat -> track 1
+open_hat -> track 1
+riser_snare -> track 1
+club_bass -> track 2
+sub_bass -> track 2
+lead -> track 3
+lead_harmony -> track 3
+pluck -> track 4
+pad -> track 5
+white_noise -> track 6
+
+[arrangement]
+bar 1: pad_fm
+bar 2: pad_db
+bar 3: pad_ab
+bar 4: pad_eb
+bar 5: pad_fm
+bar 6: pad_db
+bar 7: pad_ab
+bar 8: pad_eb
+
+bar 5: pluck_fm
+bar 6: pluck_db
+bar 7: pluck_ab
+bar 8: pluck_eb
+
+bar 9-16: drum_kick_only
+
+bar 9: pad_fm
+bar 10: pad_db
+bar 11: pad_ab
+bar 12: pad_eb
+bar 13: pad_fm
+bar 14: pad_db
+bar 15: pad_ab
+bar 16: pad_eb
+
+bar 9: pluck_fm
+bar 10: pluck_db
+bar 11: pluck_ab
+bar 12: pluck_eb
+bar 13: pluck_fm
+bar 14: pluck_db
+bar 15: pluck_ab
+bar 16: pluck_eb
+
+bar 9: bass_rolling_fm
+bar 10: bass_rolling_db
+bar 11: bass_rolling_ab
+bar 12: bass_rolling_eb
+bar 13: bass_rolling_fm
+bar 14: bass_rolling_db
+bar 15: bass_rolling_ab
+bar 16: bass_rolling_eb
+
+bar 17-24: riser_stage_1
+bar 25-28: riser_stage_2
+bar 29-31: riser_stage_3
+bar 32: riser_stage_4
+
+bar 17-32: noise_sweep
+
+bar 17: pluck_fm
+bar 18: pluck_db
+bar 19: pluck_ab
+bar 20: pluck_eb
+bar 21: pluck_fm
+bar 22: pluck_db
+bar 23: pluck_ab
+bar 24: pluck_eb
+bar 25: pluck_fm
+bar 26: pluck_db
+bar 27: pluck_ab
+bar 28: pluck_eb
+bar 29: pluck_fm
+bar 30: pluck_db
+bar 31: pluck_ab
+
+bar 17: pad_fm
+bar 18: pad_db
+bar 19: pad_ab
+bar 20: pad_eb
+bar 21: pad_fm
+bar 22: pad_db
+bar 23: pad_ab
+bar 24: pad_eb
+bar 25: pad_fm
+bar 26: pad_db
+bar 27: pad_ab
+bar 28: pad_eb
+bar 29: pad_fm
+bar 30: pad_db
+bar 31: pad_ab
+
+bar 33-40: drum_drop
+bar 41-48: drum_drop_heavy
+
+bar 33: bass_rolling_fm
+bar 34: bass_rolling_db
+bar 35: bass_rolling_ab
+bar 36: bass_rolling_eb
+bar 37: bass_rolling_fm
+bar 38: bass_rolling_db
+bar 39: bass_rolling_ab
+bar 40: bass_rolling_eb
+bar 41: bass_rolling_fm
+bar 42: bass_rolling_db
+bar 43: bass_rolling_ab
+bar 44: bass_rolling_eb
+bar 45: bass_rolling_fm
+bar 46: bass_rolling_db
+bar 47: bass_rolling_ab
+bar 48: bass_rolling_eb
+
+bar 33: lead_hook_1
+bar 34: lead_hook_2
+bar 35: lead_hook_3
+bar 36: lead_hook_4
+bar 37: lead_hook_1
+bar 38: lead_hook_2
+bar 39: lead_hook_3
+bar 40: lead_hook_4
+bar 41: lead_hook_1
+bar 42: lead_hook_2
+bar 43: lead_hook_3
+bar 44: lead_hook_4
+bar 45: lead_hook_1
+bar 46: lead_hook_2
+bar 47: lead_hook_3
+bar 48: lead_hook_4
+
+bar 41: lead_harmony_1
+bar 42: lead_harmony_2
+bar 43: lead_harmony_3
+bar 44: lead_harmony_4
+bar 45: lead_harmony_1
+bar 46: lead_harmony_2
+bar 47: lead_harmony_3
+bar 48: lead_harmony_4
+
+bar 33: pluck_fm
+bar 34: pluck_db
+bar 35: pluck_ab
+bar 36: pluck_eb
+bar 37: pluck_fm
+bar 38: pluck_db
+bar 39: pluck_ab
+bar 40: pluck_eb
+bar 41: pluck_fm
+bar 42: pluck_db
+bar 43: pluck_ab
+bar 44: pluck_eb
+bar 45: pluck_fm
+bar 46: pluck_db
+bar 47: pluck_ab
+bar 48: pluck_eb
+
+bar 41: pad_fm
+bar 42: pad_db
+bar 43: pad_ab
+bar 44: pad_eb
+bar 45: pad_fm
+bar 46: pad_db
+bar 47: pad_ab
+bar 48: pad_eb
+
+bar 49: pad_fm
+bar 50: pad_db
+bar 51: pad_ab
+bar 52: pad_eb
+bar 53: pad_fm
+bar 54: pad_db
+bar 55: pad_ab
+bar 56: pad_eb
+bar 57: pad_fm
+bar 58: pad_db
+bar 59: pad_ab
+bar 60: pad_eb
+bar 61: pad_fm
+bar 62: pad_db
+bar 63: pad_ab
+bar 64: pad_eb
+
+bar 53: pluck_fm
+bar 54: pluck_db
+bar 55: pluck_ab
+bar 56: pluck_eb
+bar 57: pluck_fm
+bar 58: pluck_db
+bar 59: pluck_ab
+bar 60: pluck_eb
+bar 61: pluck_fm
+bar 62: pluck_db
+bar 63: pluck_ab
+bar 64: pluck_eb
+
+bar 57-64: drum_kick_hat
+
+bar 57: bass_rolling_fm
+bar 58: bass_rolling_db
+bar 59: bass_rolling_ab
+bar 60: bass_rolling_eb
+bar 61: bass_rolling_fm
+bar 62: bass_rolling_db
+bar 63: bass_rolling_ab
+bar 64: bass_rolling_eb
+
+bar 65-72: riser_stage_1
+bar 73-76: riser_stage_2
+bar 77-79: riser_stage_3
+bar 80: riser_stage_4
+
+bar 65-80: noise_sweep
+
+bar 65: pluck_fm
+bar 66: pluck_db
+bar 67: pluck_ab
+bar 68: pluck_eb
+bar 69: pluck_fm
+bar 70: pluck_db
+bar 71: pluck_ab
+bar 72: pluck_eb
+bar 73: pluck_fm
+bar 74: pluck_db
+bar 75: pluck_ab
+bar 76: pluck_eb
+bar 77: pluck_fm
+bar 78: pluck_db
+bar 79: pluck_ab
+
+bar 65: lead_hook_1
+bar 66: lead_hook_2
+bar 67: lead_hook_3
+bar 68: lead_hook_4
+bar 69: lead_hook_1
+bar 70: lead_hook_2
+bar 71: lead_hook_3
+bar 72: lead_hook_4
+bar 73: lead_hook_1
+bar 74: lead_hook_2
+bar 75: lead_hook_3
+bar 76: lead_hook_4
+bar 77: lead_hook_1
+bar 78: lead_hook_2
+bar 79: lead_hook_3
+
+bar 81-88: drum_drop
+bar 89-96: drum_drop_heavy
+
+bar 81: bass_rolling_fm
+bar 82: bass_rolling_db
+bar 83: bass_rolling_ab
+bar 84: bass_rolling_eb
+bar 85: bass_rolling_fm
+bar 86: bass_rolling_db
+bar 87: bass_rolling_ab
+bar 88: bass_rolling_eb
+bar 89: bass_rolling_fm
+bar 90: bass_rolling_db
+bar 91: bass_rolling_ab
+bar 92: bass_rolling_eb
+bar 93: bass_rolling_fm
+bar 94: bass_rolling_db
+bar 95: bass_rolling_ab
+bar 96: bass_rolling_eb
+
+bar 81: lead_hook_1
+bar 82: lead_hook_2
+bar 83: lead_hook_3
+bar 84: lead_hook_4
+bar 85: lead_hook_1
+bar 86: lead_hook_2
+bar 87: lead_hook_3
+bar 88: lead_hook_4
+bar 89: lead_hook_1
+bar 90: lead_hook_2
+bar 91: lead_hook_3
+bar 92: lead_hook_4
+bar 93: lead_hook_1
+bar 94: lead_hook_2
+bar 95: lead_hook_3
+bar 96: lead_hook_4
+
+bar 81: lead_harmony_1
+bar 82: lead_harmony_2
+bar 83: lead_harmony_3
+bar 84: lead_harmony_4
+bar 85: lead_harmony_1
+bar 86: lead_harmony_2
+bar 87: lead_harmony_3
+bar 88: lead_harmony_4
+bar 89: lead_harmony_1
+bar 90: lead_harmony_2
+bar 91: lead_harmony_3
+bar 92: lead_harmony_4
+bar 93: lead_harmony_1
+bar 94: lead_harmony_2
+bar 95: lead_harmony_3
+bar 96: lead_harmony_4
+
+bar 81: pluck_fm
+bar 82: pluck_db
+bar 83: pluck_ab
+bar 84: pluck_eb
+bar 85: pluck_fm
+bar 86: pluck_db
+bar 87: pluck_ab
+bar 88: pluck_eb
+bar 89: pluck_fm
+bar 90: pluck_db
+bar 91: pluck_ab
+bar 92: pluck_eb
+bar 93: pluck_fm
+bar 94: pluck_db
+bar 95: pluck_ab
+bar 96: pluck_eb
+
+bar 81: pad_fm
+bar 82: pad_db
+bar 83: pad_ab
+bar 84: pad_eb
+bar 85: pad_fm
+bar 86: pad_db
+bar 87: pad_ab
+bar 88: pad_eb
+bar 89: pad_fm
+bar 90: pad_db
+bar 91: pad_ab
+bar 92: pad_eb
+bar 93: pad_fm
+bar 94: pad_db
+bar 95: pad_ab
+bar 96: pad_eb
+
+bar 97-102: drum_kick_hat
+bar 97: bass_rolling_fm
+bar 98: bass_rolling_db
+bar 99: bass_rolling_ab
+bar 100: bass_rolling_eb
+bar 101: bass_rolling_fm
+bar 102: bass_rolling_db
+
+bar 97: pluck_fm
+bar 98: pluck_db
+bar 99: pluck_ab
+bar 100: pluck_eb
+bar 101: pluck_fm
+bar 102: pluck_db
+bar 103: pluck_ab
+bar 104: pluck_eb
+
+bar 97: pad_fm
+bar 98: pad_db
+bar 99: pad_ab
+bar 100: pad_eb
+bar 101: pad_fm
+bar 102: pad_db
+bar 103: pad_ab
+bar 104: pad_eb
+
+[automation]
+automate track 4.filter_cutoff from 350 to 3200 over bar 1-16 curve=exponential
+automate track 2.filter_cutoff from 350 to 800 over bar 9-16 curve=linear
+automate track 6.filter_cutoff from 400 to 7500 over bar 17-32 curve=exponential
+automate track 3.filter_cutoff from 1500 to 8000 over bar 33-36 curve=exponential
+automate track 2.filter_cutoff from 800 to 300 over bar 49-56 curve=exponential
+automate track 4.filter_cutoff from 3200 to 600 over bar 49-56 curve=exponential
+automate track 6.filter_cutoff from 400 to 8500 over bar 65-80 curve=exponential
+automate track 3.filter_cutoff from 1000 to 9000 over bar 65-80 curve=exponential
+automate track 4.filter_cutoff from 3200 to 400 over bar 97-104 curve=exponential
+automate master.gain from 0dB to -24dB over bar 101-104 curve=exponential

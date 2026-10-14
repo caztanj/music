@@ -294,4 +294,384 @@ end_to_end_tests :: () {
 
         expect_true(!has_numerical_error);
     });
+
+    test("midnight_coffee_showcase_song_validation", () {
+        song_specification, parse_success, parse_error_message := parse_song_from_file("songs/midnight_coffee.song", check_samples_on_disk = true);
+        expect_true(parse_success);
+        expect_equals(song_specification.project.name, "Midnight Coffee");
+        expect_equals(song_specification.project.beats_per_minute, 78.0);
+        expect_equals(song_specification.instruments.count, 10);
+        expect_equals(song_specification.mixer.tracks.count, 6);
+        expect_equals(song_specification.mixer.aux_tracks.count, 1);
+        expect_equals(song_specification.automation.curves.count, 7);
+
+        sample_rate: s64 = 44100;
+        sequencer: Sequencer;
+        configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+        sequencer.clock.is_looping = false;
+
+        total_clock_samples := calculate_total_clock_samples(*sequencer.clock);
+        duration_in_seconds := cast(float) total_clock_samples / cast(float) sample_rate;
+        expect_true(duration_in_seconds >= 180.0);
+
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, sample_rate);
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+        configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+        test_block_frames: s64 = 1024;
+        audio_buffer := NewArray(test_block_frames * 2, float);
+        defer free(audio_buffer.data);
+
+        render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, audio_buffer, test_block_frames);
+
+        has_numerical_error := false;
+        sample_index := 0;
+        while sample_index < audio_buffer.count {
+            sample_value := audio_buffer[sample_index];
+            is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+            if is_nan_value || is_inf_value {
+                has_numerical_error = true;
+                break;
+            }
+            sample_index += 1;
+        }
+
+        expect_true(!has_numerical_error);
+    });
+
+    test("pulse_reactor_showcase_song_validation", () {
+        song_specification, parse_success, parse_error_message := parse_song_from_file("songs/pulse_reactor.song", check_samples_on_disk = true);
+        expect_true(parse_success);
+        expect_equals(song_specification.project.name, "Pulse Reactor");
+        expect_equals(song_specification.project.beats_per_minute, 128.0);
+        expect_equals(song_specification.instruments.count, 13);
+        expect_equals(song_specification.mixer.tracks.count, 6);
+        expect_equals(song_specification.mixer.aux_tracks.count, 1);
+        expect_equals(song_specification.automation.curves.count, 10);
+
+        sample_rate: s64 = 44100;
+        sequencer: Sequencer;
+        configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+        sequencer.clock.is_looping = false;
+
+        total_clock_samples := calculate_total_clock_samples(*sequencer.clock);
+        duration_in_seconds := cast(float) total_clock_samples / cast(float) sample_rate;
+        expect_true(duration_in_seconds >= 180.0);
+
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, sample_rate);
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+        configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+        test_block_frames: s64 = 1024;
+        audio_buffer := NewArray(test_block_frames * 2, float);
+        defer free(audio_buffer.data);
+
+        render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, audio_buffer, test_block_frames);
+
+        has_numerical_error := false;
+        sample_index := 0;
+        while sample_index < audio_buffer.count {
+            sample_value := audio_buffer[sample_index];
+            is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+            if is_nan_value || is_inf_value {
+                has_numerical_error = true;
+                break;
+            }
+            sample_index += 1;
+        }
+
+        expect_true(!has_numerical_error);
+    });
+
+    test("stress_test_voice_engine_under_maximum_polyphony", () {
+        sample_rate: s64 = 44100;
+        voice_manager := New(Voice_Manager);
+        defer free(voice_manager);
+        initialize_voice_manager(voice_manager, sample_rate);
+
+        configuration: Synthesizer_Configuration;
+        configuration.waveform = .SAWTOOTH;
+        configuration.oscillator_2_enabled = true;
+        configuration.oscillator_2_waveform = .SQUARE;
+        configuration.oscillator_2_semitones = -12;
+        configuration.oscillator_mix = 0.5;
+        configuration.noise_type = .PINK_NOISE;
+        configuration.noise_level = 0.2;
+        configuration.unison_voices = 4;
+        configuration.unison_detune = 20.0;
+        configuration.unison_spread = 0.8;
+        configuration.filter.type = .LOWPASS;
+        configuration.filter.cutoff_frequency_hertz = 1500.0;
+        configuration.filter.resonance = 0.3;
+        configuration.envelope.attack_milliseconds = 5.0;
+        configuration.envelope.decay_milliseconds = 200.0;
+        configuration.envelope.sustain_level = 0.8;
+        configuration.envelope.release_milliseconds = 100.0;
+        configuration.lfo_1.enabled = true;
+        configuration.lfo_1.waveform = .SINE;
+        configuration.lfo_1.destination = .FILTER_CUTOFF;
+        configuration.lfo_1.rate_hertz = 3.5;
+        configuration.lfo_1.amount = 0.25;
+
+        note_index := 0;
+        while note_index < MAXIMUM_VOICES {
+            midi_note := cast(s32) (36 + (note_index % 48));
+            trigger_synthesizer_note(voice_manager, "lead", 1, configuration, midi_note, 0.9);
+            note_index += 1;
+        }
+
+        expect_equals(count_active_voices(voice_manager), MAXIMUM_VOICES);
+
+        overflow_index := 0;
+        while overflow_index < 32 {
+            midi_note := cast(s32) (60 + overflow_index);
+            trigger_synthesizer_note(voice_manager, "lead", 1, configuration, midi_note, 1.0);
+            overflow_index += 1;
+        }
+
+        expect_equals(count_active_voices(voice_manager), MAXIMUM_VOICES);
+
+        render_buffer_frames: s64 = 1024;
+        left_channel_buffer := NewArray(render_buffer_frames, float);
+        defer free(left_channel_buffer.data);
+        right_channel_buffer := NewArray(render_buffer_frames, float);
+        defer free(right_channel_buffer.data);
+
+        blocks_to_render := 8;
+        block_counter := 0;
+        has_numerical_instability := false;
+        has_sound_output := false;
+
+        while block_counter < blocks_to_render {
+            render_track_voices_into_buffer(voice_manager, 1, left_channel_buffer, right_channel_buffer);
+
+            sample_index := 0;
+            while sample_index < render_buffer_frames {
+                left_sample := left_channel_buffer[sample_index];
+                right_sample := right_channel_buffer[sample_index];
+
+                left_nan, left_inf := is_nan_is_inf(left_sample);
+                right_nan, right_inf := is_nan_is_inf(right_sample);
+                if left_nan || left_inf || right_nan || right_inf {
+                    has_numerical_instability = true;
+                    break;
+                }
+
+                if abs(left_sample) > 0.001 || abs(right_sample) > 0.001 {
+                    has_sound_output = true;
+                }
+
+                sample_index += 1;
+            }
+
+            block_counter += 1;
+        }
+
+        expect_true(!has_numerical_instability);
+        expect_true(has_sound_output);
+    });
+
+    test("stress_test_effect_pipelines_and_heavy_automation", () {
+        sample_rate: s64 = 44100;
+        beats_per_minute: float = 130.0;
+
+        mixer := New(Mixer);
+        defer {
+            deinitialize_mixer(mixer);
+            free(mixer);
+        }
+
+        mixer_definition: Mixer_Definition;
+        track_counter := 1;
+        while track_counter <= 8 {
+            track_definition: Mixer_Track_Definition;
+            track_definition.track_index = track_counter;
+            track_definition.gain = 0.8;
+            track_definition.pan = ifx (track_counter % 2 == 0) then 0.2 else -0.2;
+            track_definition.filter_enabled = true;
+            track_definition.filter_type = .LOWPASS;
+            track_definition.filter_cutoff_frequency_hertz = 2000.0;
+            track_definition.filter_resonance = 0.3;
+            track_definition.equalizer_enabled = true;
+            track_definition.equalizer_low_gain_decibels = 2.0;
+            track_definition.equalizer_low_frequency_hertz = 120.0;
+            track_definition.equalizer_mid_gain_decibels = -2.0;
+            track_definition.equalizer_mid_frequency_hertz = 1000.0;
+            track_definition.equalizer_mid_quality_factor = 1.0;
+            track_definition.equalizer_high_gain_decibels = 1.5;
+            track_definition.equalizer_high_frequency_hertz = 8000.0;
+            track_definition.chorus_enabled = true;
+            track_definition.chorus_mix = 0.4;
+            track_definition.chorus_rate_hertz = 1.2;
+            track_definition.chorus_depth_milliseconds = 2.0;
+            track_definition.saturation_enabled = true;
+            track_definition.saturation_type = ifx (track_counter % 2 == 0) then .TANH else .CUBIC;
+            track_definition.saturation_drive = 1.5;
+            track_definition.saturation_mix = 0.7;
+            track_definition.compressor_enabled = true;
+            track_definition.compressor_threshold_decibels = -12.0;
+            track_definition.compressor_ratio = 4.0;
+            track_definition.compressor_attack_milliseconds = 2.0;
+            track_definition.compressor_release_milliseconds = 80.0;
+            track_definition.delay_time_seconds = 0.25;
+            track_definition.delay_feedback = 0.3;
+            track_definition.send_levels[0] = 0.4;
+            if track_counter > 1 {
+                track_definition.sidechain_source_track_index = 1;
+                track_definition.sidechain_depth_decibels = 10.0;
+            }
+
+            array_add(*mixer_definition.tracks, track_definition);
+            track_counter += 1;
+        }
+
+        aux_definition: Aux_Track_Definition;
+        aux_definition.aux_index = 1;
+        aux_definition.gain = 0.8;
+        aux_definition.reverb_enabled = true;
+        aux_definition.reverb_room_size = 0.8;
+        aux_definition.reverb_damping = 0.3;
+        aux_definition.reverb_predelay_milliseconds = 20.0;
+        array_add(*mixer_definition.aux_tracks, aux_definition);
+
+        mixer_definition.master.gain = 1.0;
+        mixer_definition.master.limiter_enabled = true;
+
+        configure_mixer_from_definition(mixer, mixer_definition, sample_rate, beats_per_minute);
+
+        frames_per_block: s64 = 512;
+        output_buffer := NewArray(frames_per_block * 2, float);
+        defer free(output_buffer.data);
+
+        blocks_to_render := 16;
+        block_counter := 0;
+        has_numerical_errors := false;
+
+        while block_counter < blocks_to_render {
+            clear_channel_buffers(mixer, frames_per_block);
+
+            track_index := 0;
+            while track_index < 8 {
+                channel := *mixer.tracks[track_index];
+                sample_index := 0;
+                while sample_index < frames_per_block {
+                    synthetic_signal := sin(cast(float) (block_counter * frames_per_block + sample_index) * 0.05) * 0.5;
+                    channel.left_buffer[sample_index] = synthetic_signal;
+                    channel.right_buffer[sample_index] = synthetic_signal;
+                    sample_index += 1;
+                }
+                track_index += 1;
+            }
+
+            sweep_cutoff := 300.0 + cast(float) (block_counter * 300);
+            track_index = 0;
+            while track_index < 8 {
+                channel := *mixer.tracks[track_index];
+                channel.filter_insert.cutoff_frequency_hertz = sweep_cutoff;
+                channel.pan = sin(cast(float) block_counter * 0.3) * 0.7;
+                track_index += 1;
+            }
+
+            mix_channels_to_master(mixer, frames_per_block);
+            render_mixer_master_block_interleaved(mixer, output_buffer, frames_per_block);
+
+            sample_index := 0;
+            while sample_index < output_buffer.count {
+                sample_value := output_buffer[sample_index];
+                is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+                if is_nan_value || is_inf_value {
+                    has_numerical_errors = true;
+                    break;
+                }
+                sample_index += 1;
+            }
+
+            block_counter += 1;
+        }
+
+        expect_true(!has_numerical_errors);
+        expect_true(mixer.master.limiter.envelope_follower >= 0.0);
+    });
+
+    test("showcase_songs_rendering_benchmark_and_cpu_load", () {
+        song_paths: [3] string;
+        song_paths[0] = "songs/cyber_city.song";
+        song_paths[1] = "songs/midnight_coffee.song";
+        song_paths[2] = "songs/pulse_reactor.song";
+
+        sample_rate: s64 = 44100;
+        frames_per_block: s64 = 512;
+        blocks_to_benchmark: s64 = 40;
+        total_benchmark_frames := frames_per_block * blocks_to_benchmark;
+        audio_duration_seconds := cast(float64) total_benchmark_frames / cast(float64) sample_rate;
+
+        output_buffer := NewArray(frames_per_block * 2, float);
+        defer free(output_buffer.data);
+
+        song_index := 0;
+        while song_index < song_paths.count {
+            song_path := song_paths[song_index];
+            song_specification, parse_success, _ := parse_song_from_file(song_path, check_samples_on_disk = true);
+            expect_true(parse_success);
+
+            sequencer: Sequencer;
+            configure_sequencer_from_song(*sequencer, *song_specification, sample_rate);
+            sequencer.clock.is_looping = false;
+
+            voice_manager := New(Voice_Manager);
+            defer free(voice_manager);
+            initialize_voice_manager(voice_manager, sample_rate);
+
+            mixer := New(Mixer);
+            defer {
+                deinitialize_mixer(mixer);
+                free(mixer);
+            }
+            configure_mixer_from_definition(mixer, song_specification.mixer, sample_rate, song_specification.project.beats_per_minute);
+
+            start_time := current_time_monotonic();
+
+            block_index: s64 = 0;
+            has_numerical_error := false;
+
+            while block_index < blocks_to_benchmark {
+                render_sequencer_block(*sequencer, *song_specification, voice_manager, mixer, output_buffer, frames_per_block);
+
+                sample_index := 0;
+                while sample_index < output_buffer.count {
+                    sample_value := output_buffer[sample_index];
+                    is_nan_value, is_inf_value := is_nan_is_inf(sample_value);
+                    if is_nan_value || is_inf_value {
+                        has_numerical_error = true;
+                        break;
+                    }
+                    sample_index += 1;
+                }
+
+                block_index += 1;
+            }
+
+            render_duration_seconds, _ := to_float64_seconds(current_time_monotonic() - start_time);
+            cpu_percentage := (render_duration_seconds / audio_duration_seconds) * 100.0;
+
+            expect_true(!has_numerical_error);
+            expect_true(cpu_percentage < 15.0);
+
+            song_index += 1;
+        }
+    });
 }

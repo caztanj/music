@@ -1,0 +1,473 @@
+[project]
+name = "Midnight Coffee"
+bpm = 78
+time_signature = 4/4
+bars = 64
+swing = 0.58
+
+[instruments]
+kick = sampler("samples/kick.wav", gain = 0.85)
+snare = sampler("samples/snare.wav", gain = 0.70)
+rim = sampler("samples/snare.wav", attack = 2, decay = 55, gain = 0.65)
+hihat_closed = sampler("samples/hihat.wav", attack = 1, decay = 65, choke = 1, gain = 0.55)
+hihat_open = sampler("samples/hihat.wav", attack = 2, decay = 280, choke = 1, gain = 0.50)
+vinyl = synth(wave="pink", filter="bandpass", cutoff=1800, res=0.25, attack=50, decay=100, sustain=1.0, release=100, gain=0.10)
+rhodes = synth(wave="sine", wave2="triangle", osc_mix=0.35, coarse2=12, tune2=3.0, filter="lowpass", cutoff=1500, res=0.15, attack=12, decay=900, sustain=0.45, release=350, lfo1_wave="sine", lfo1_dest="pitch", lfo1_rate=4.2, lfo1_amount=0.06, gain=0.72)
+bass = synth(wave="triangle", wave2="sine", osc_mix=0.35, coarse2=-12, filter="lowpass", cutoff=420, res=0.15, attack=10, decay=240, sustain=0.7, release=120, gain=0.88)
+guitar_lead = synth(wave="triangle", wave2="saw", osc_mix=0.20, filter="lowpass", cutoff=1800, res=0.25, attack=16, decay=350, sustain=0.5, release=220, lfo1_wave="sine", lfo1_dest="pitch", lfo1_rate=5.0, lfo1_amount=0.10, gain=0.68)
+ambient_pad = synth(wave="sine", wave2="sine", tune2=6.0, osc_mix=0.50, filter="lowpass", cutoff=1100, res=0.15, attack=160, decay=320, sustain=0.85, release=400, gain=0.55)
+
+[pattern vinyl_loop]
+C4 step=0 len=16 vel=0.70
+
+[pattern drum_intro]
+rim          | . . . . x . . . . . . . x . . . |
+hihat_closed | . . x . . . x . . . x . . . x . |
+
+[pattern drum_main_a]
+kick         | x . . . . . . x . . x . . . . . |
+snare        | . . . . x . . . . . . . x . . . |
+hihat_closed | x . x . x . x . x . x . x . . . |
+hihat_open   | . . . . . . . . . . . . . . x . |
+
+[pattern drum_main_b]
+kick         | x . . . . . x . . . x . . . . . |
+snare        | . . . . x . . . . . . . x . . . |
+rim          | . . . . . . . . . x . . . . . . |
+hihat_closed | x . x . x . x . x . x . x . x . |
+
+[pattern drum_chorus]
+kick         | x . . . . . x . . . x . . . x . |
+snare        | . . . . x . . . . . . . x . . . |
+hihat_closed | x . x . x . x . x . x . x . . . |
+hihat_open   | . . . . . . . . . . . . . . x . |
+
+[pattern drum_break]
+kick         | x . . . . . . . . . x . . . . . |
+rim          | . . . . x . . . . . . . x . . . |
+hihat_closed | . . x . . . x . . . x . . . x . |
+
+[pattern drum_outro]
+kick         | x . . . . . . . . . . . . . . . |
+rim          | . . . . x . . . . . . . . . . . |
+hihat_closed | . . x . . . x . . . . . . . . . |
+
+[pattern rhodes_chord_bbmaj7]
+Bb2 step=0 len=14 vel=0.75
+D3 step=0 len=14 vel=0.72
+F3 step=0 len=14 vel=0.70
+A3 step=0 len=14 vel=0.68
+C4 step=0 len=14 vel=0.65
+F3 step=14 len=2 vel=0.55
+
+[pattern rhodes_chord_am7]
+A2 step=0 len=14 vel=0.75
+C3 step=0 len=14 vel=0.72
+E3 step=0 len=14 vel=0.70
+G3 step=0 len=14 vel=0.68
+C4 step=0 len=14 vel=0.65
+E3 step=14 len=2 vel=0.55
+
+[pattern rhodes_chord_gm9]
+G2 step=0 len=14 vel=0.75
+Bb2 step=0 len=14 vel=0.72
+D3 step=0 len=14 vel=0.70
+F3 step=0 len=14 vel=0.68
+A3 step=0 len=14 vel=0.65
+D3 step=14 len=2 vel=0.55
+
+[pattern rhodes_chord_fmaj7]
+F2 step=0 len=14 vel=0.75
+A2 step=0 len=14 vel=0.72
+C3 step=0 len=14 vel=0.70
+E3 step=0 len=14 vel=0.68
+G3 step=0 len=14 vel=0.65
+C3 step=14 len=2 vel=0.55
+
+[pattern rhodes_chord_dm9]
+D3 step=0 len=14 vel=0.78
+F3 step=0 len=14 vel=0.74
+A3 step=0 len=14 vel=0.70
+C4 step=0 len=14 vel=0.68
+E4 step=0 len=14 vel=0.65
+A3 step=14 len=2 vel=0.58
+
+[pattern rhodes_chord_g7]
+G2 step=0 len=14 vel=0.78
+B2 step=0 len=14 vel=0.72
+F3 step=0 len=14 vel=0.70
+A3 step=0 len=14 vel=0.68
+D4 step=0 len=14 vel=0.65
+F3 step=14 len=2 vel=0.58
+
+[pattern bass_verse_bb]
+Bb1 step=0 len=4 vel=0.90
+Bb1 step=6 len=2 vel=0.75
+F1 step=8 len=4 vel=0.85
+A1 step=14 len=2 vel=0.80
+
+[pattern bass_verse_am]
+A1 step=0 len=4 vel=0.90
+A1 step=6 len=2 vel=0.75
+E1 step=8 len=4 vel=0.85
+Ab1 step=14 len=2 vel=0.80
+
+[pattern bass_verse_gm]
+G1 step=0 len=4 vel=0.90
+G1 step=6 len=2 vel=0.75
+D1 step=8 len=4 vel=0.85
+Gb1 step=14 len=2 vel=0.80
+
+[pattern bass_verse_f]
+F1 step=0 len=4 vel=0.90
+F1 step=6 len=2 vel=0.75
+C1 step=8 len=4 vel=0.85
+A1 step=14 len=2 vel=0.80
+
+[pattern bass_chorus_dm]
+D1 step=0 len=4 vel=0.92
+D1 step=6 len=2 vel=0.78
+A1 step=8 len=4 vel=0.88
+C2 step=14 len=2 vel=0.82
+
+[pattern bass_chorus_g]
+G1 step=0 len=4 vel=0.92
+G1 step=6 len=2 vel=0.78
+D1 step=8 len=4 vel=0.88
+F1 step=14 len=2 vel=0.82
+
+[pattern pad_verse_bb]
+Bb2 step=0 len=16 vel=0.65
+F3 step=0 len=16 vel=0.65
+A3 step=0 len=16 vel=0.60
+D4 step=0 len=16 vel=0.55
+
+[pattern pad_verse_am]
+A2 step=0 len=16 vel=0.65
+E3 step=0 len=16 vel=0.65
+G3 step=0 len=16 vel=0.60
+C4 step=0 len=16 vel=0.55
+
+[pattern pad_verse_gm]
+G2 step=0 len=16 vel=0.65
+D3 step=0 len=16 vel=0.65
+F3 step=0 len=16 vel=0.60
+Bb3 step=0 len=16 vel=0.55
+
+[pattern pad_verse_f]
+F2 step=0 len=16 vel=0.65
+C3 step=0 len=16 vel=0.65
+E3 step=0 len=16 vel=0.60
+A3 step=0 len=16 vel=0.55
+
+[pattern lead_melody_1]
+A4 step=0 len=3 vel=0.80
+C5 step=4 len=3 vel=0.85
+D5 step=8 len=4 vel=0.90
+C5 step=13 len=3 vel=0.75
+
+[pattern lead_melody_2]
+G4 step=0 len=4 vel=0.85
+E4 step=6 len=2 vel=0.80
+G4 step=8 len=4 vel=0.85
+A4 step=13 len=3 vel=0.75
+
+[pattern lead_melody_3]
+F4 step=0 len=3 vel=0.80
+A4 step=4 len=3 vel=0.85
+C5 step=8 len=4 vel=0.90
+Bb4 step=13 len=3 vel=0.75
+
+[pattern lead_melody_4]
+A4 step=0 len=4 vel=0.85
+G4 step=6 len=2 vel=0.80
+F4 step=8 len=6 vel=0.85
+
+[pattern lead_hook_1]
+D5 step=0 len=4 vel=0.90
+F5 step=4 len=2 vel=0.85
+E5 step=6 len=2 vel=0.85
+D5 step=8 len=4 vel=0.90
+A4 step=13 len=3 vel=0.80
+
+[pattern lead_hook_2]
+B4 step=0 len=3 vel=0.85
+D5 step=4 len=3 vel=0.85
+G5 step=8 len=4 vel=0.95
+F5 step=12 len=2 vel=0.85
+E5 step=14 len=2 vel=0.80
+
+[pattern lead_hook_3]
+D5 step=0 len=4 vel=0.90
+C5 step=4 len=2 vel=0.85
+Bb4 step=6 len=2 vel=0.85
+A4 step=8 len=4 vel=0.90
+F4 step=13 len=3 vel=0.80
+
+[pattern lead_hook_4]
+G4 step=0 len=4 vel=0.85
+A4 step=4 len=2 vel=0.85
+C5 step=6 len=2 vel=0.90
+D5 step=8 len=6 vel=0.95
+
+[mixer]
+track 1 (drums): gain = 0.88, pan = 0.0, saturation = "tanh", drive = 1.8, saturation_mix = 0.60, eq_low = 2.0, eq_low_freq = 90, eq_high = -2.5, eq_high_freq = 9000, send1 = 0.20, output = master
+track 2 (bass): gain = 0.85, pan = 0.0, filter = "lowpass", cutoff = 500, res = 0.15, sidechain = track 1, ducking_depth = 7, comp_attack = 4, comp_release = 150, output = master
+track 3 (rhodes): gain = 0.72, pan = -0.10, filter = "lowpass", cutoff = 2200, res = 0.15, chorus = 0.35, chorus_rate = 0.9, chorus_depth = 2.5, delay = 0.375, feedback = 0.25, send1 = 0.40, output = master
+track 4 (lead): gain = 0.68, pan = 0.15, filter = "lowpass", cutoff = 2400, res = 0.20, delay = 0.25, feedback = 0.35, send1 = 0.45, output = master
+track 5 (pad): gain = 0.60, pan = 0.0, filter = "lowpass", cutoff = 1600, res = 0.15, chorus = 0.40, chorus_rate = 0.7, send1 = 0.55, output = master
+track 6 (vinyl): gain = 0.45, pan = 0.05, filter = "bandpass", cutoff = 1800, res = 0.30, saturation = "tanh", drive = 2.2, saturation_mix = 0.75, output = master
+aux 1 (reverb): gain = 0.75, reverb = 0.80, reverb_room = 0.75, reverb_damp = 0.45, reverb_predelay = 25.0
+master: gain = 0.95, limiter = on
+
+[channel_routing]
+kick -> track 1
+snare -> track 1
+rim -> track 1
+hihat_closed -> track 1
+hihat_open -> track 1
+bass -> track 2
+rhodes -> track 3
+guitar_lead -> track 4
+ambient_pad -> track 5
+vinyl -> track 6
+
+[arrangement]
+bar 1-64: vinyl_loop
+
+bar 1-8: drum_intro
+bar 1: rhodes_chord_bbmaj7
+bar 2: rhodes_chord_am7
+bar 3: rhodes_chord_gm9
+bar 4: rhodes_chord_fmaj7
+bar 5: rhodes_chord_bbmaj7
+bar 6: rhodes_chord_am7
+bar 7: rhodes_chord_gm9
+bar 8: rhodes_chord_fmaj7
+
+bar 5: pad_verse_bb
+bar 6: pad_verse_am
+bar 7: pad_verse_gm
+bar 8: pad_verse_f
+
+bar 9-16: drum_main_a
+bar 17-24: drum_main_b
+
+bar 9: rhodes_chord_bbmaj7
+bar 10: rhodes_chord_am7
+bar 11: rhodes_chord_gm9
+bar 12: rhodes_chord_fmaj7
+bar 13: rhodes_chord_bbmaj7
+bar 14: rhodes_chord_am7
+bar 15: rhodes_chord_gm9
+bar 16: rhodes_chord_fmaj7
+
+bar 17: rhodes_chord_bbmaj7
+bar 18: rhodes_chord_am7
+bar 19: rhodes_chord_gm9
+bar 20: rhodes_chord_fmaj7
+bar 21: rhodes_chord_bbmaj7
+bar 22: rhodes_chord_am7
+bar 23: rhodes_chord_gm9
+bar 24: rhodes_chord_fmaj7
+
+bar 9: bass_verse_bb
+bar 10: bass_verse_am
+bar 11: bass_verse_gm
+bar 12: bass_verse_f
+bar 13: bass_verse_bb
+bar 14: bass_verse_am
+bar 15: bass_verse_gm
+bar 16: bass_verse_f
+
+bar 17: bass_verse_bb
+bar 18: bass_verse_am
+bar 19: bass_verse_gm
+bar 20: bass_verse_f
+bar 21: bass_verse_bb
+bar 22: bass_verse_am
+bar 23: bass_verse_gm
+bar 24: bass_verse_f
+
+bar 17: lead_melody_1
+bar 18: lead_melody_2
+bar 19: lead_melody_3
+bar 20: lead_melody_4
+bar 21: lead_melody_1
+bar 22: lead_melody_2
+bar 23: lead_melody_3
+bar 24: lead_melody_4
+
+bar 13: pad_verse_bb
+bar 14: pad_verse_am
+bar 15: pad_verse_gm
+bar 16: pad_verse_f
+bar 21: pad_verse_bb
+bar 22: pad_verse_am
+bar 23: pad_verse_gm
+bar 24: pad_verse_f
+
+bar 25-40: drum_chorus
+
+bar 25: rhodes_chord_dm9
+bar 26: rhodes_chord_g7
+bar 27: rhodes_chord_bbmaj7
+bar 28: rhodes_chord_am7
+bar 29: rhodes_chord_dm9
+bar 30: rhodes_chord_g7
+bar 31: rhodes_chord_bbmaj7
+bar 32: rhodes_chord_am7
+bar 33: rhodes_chord_dm9
+bar 34: rhodes_chord_g7
+bar 35: rhodes_chord_bbmaj7
+bar 36: rhodes_chord_am7
+bar 37: rhodes_chord_dm9
+bar 38: rhodes_chord_g7
+bar 39: rhodes_chord_bbmaj7
+bar 40: rhodes_chord_am7
+
+bar 25: bass_chorus_dm
+bar 26: bass_chorus_g
+bar 27: bass_verse_bb
+bar 28: bass_verse_am
+bar 29: bass_chorus_dm
+bar 30: bass_chorus_g
+bar 31: bass_verse_bb
+bar 32: bass_verse_am
+bar 33: bass_chorus_dm
+bar 34: bass_chorus_g
+bar 35: bass_verse_bb
+bar 36: bass_verse_am
+bar 37: bass_chorus_dm
+bar 38: bass_chorus_g
+bar 39: bass_verse_bb
+bar 40: bass_verse_am
+
+bar 25: lead_hook_1
+bar 26: lead_hook_2
+bar 27: lead_hook_3
+bar 28: lead_hook_4
+bar 29: lead_hook_1
+bar 30: lead_hook_2
+bar 31: lead_hook_3
+bar 32: lead_hook_4
+bar 33: lead_hook_1
+bar 34: lead_hook_2
+bar 35: lead_hook_3
+bar 36: lead_hook_4
+bar 37: lead_hook_1
+bar 38: lead_hook_2
+bar 39: lead_hook_3
+bar 40: lead_hook_4
+
+bar 25: pad_verse_bb
+bar 26: pad_verse_am
+bar 27: pad_verse_bb
+bar 28: pad_verse_am
+bar 29: pad_verse_bb
+bar 30: pad_verse_am
+bar 31: pad_verse_bb
+bar 32: pad_verse_am
+bar 33: pad_verse_bb
+bar 34: pad_verse_am
+bar 35: pad_verse_bb
+bar 36: pad_verse_am
+bar 37: pad_verse_bb
+bar 38: pad_verse_am
+bar 39: pad_verse_bb
+bar 40: pad_verse_am
+
+bar 41-48: drum_break
+
+bar 41: rhodes_chord_bbmaj7
+bar 42: rhodes_chord_am7
+bar 43: rhodes_chord_gm9
+bar 44: rhodes_chord_fmaj7
+bar 45: rhodes_chord_bbmaj7
+bar 46: rhodes_chord_am7
+bar 47: rhodes_chord_gm9
+bar 48: rhodes_chord_fmaj7
+
+bar 41: pad_verse_bb
+bar 42: pad_verse_am
+bar 43: pad_verse_gm
+bar 44: pad_verse_f
+bar 45: pad_verse_bb
+bar 46: pad_verse_am
+bar 47: pad_verse_gm
+bar 48: pad_verse_f
+
+bar 45: lead_melody_1
+bar 46: lead_melody_2
+bar 47: lead_melody_3
+bar 48: lead_melody_4
+
+bar 49-56: drum_main_b
+
+bar 49: rhodes_chord_bbmaj7
+bar 50: rhodes_chord_am7
+bar 51: rhodes_chord_gm9
+bar 52: rhodes_chord_fmaj7
+bar 53: rhodes_chord_bbmaj7
+bar 54: rhodes_chord_am7
+bar 55: rhodes_chord_gm9
+bar 56: rhodes_chord_fmaj7
+
+bar 49: bass_verse_bb
+bar 50: bass_verse_am
+bar 51: bass_verse_gm
+bar 52: bass_verse_f
+bar 53: bass_verse_bb
+bar 54: bass_verse_am
+bar 55: bass_verse_gm
+bar 56: bass_verse_f
+
+bar 49: lead_melody_1
+bar 50: lead_melody_2
+bar 51: lead_melody_3
+bar 52: lead_melody_4
+bar 53: lead_melody_1
+bar 54: lead_melody_2
+bar 55: lead_melody_3
+bar 56: lead_melody_4
+
+bar 49: pad_verse_bb
+bar 50: pad_verse_am
+bar 51: pad_verse_gm
+bar 52: pad_verse_f
+bar 53: pad_verse_bb
+bar 54: pad_verse_am
+bar 55: pad_verse_gm
+bar 56: pad_verse_f
+
+bar 57-64: drum_outro
+
+bar 57: rhodes_chord_bbmaj7
+bar 58: rhodes_chord_am7
+bar 59: rhodes_chord_gm9
+bar 60: rhodes_chord_fmaj7
+bar 61: rhodes_chord_bbmaj7
+bar 62: rhodes_chord_am7
+bar 63: rhodes_chord_gm9
+bar 64: rhodes_chord_fmaj7
+
+bar 57: pad_verse_bb
+bar 58: pad_verse_am
+bar 59: pad_verse_gm
+bar 60: pad_verse_f
+bar 61: pad_verse_bb
+bar 62: pad_verse_am
+bar 63: pad_verse_gm
+bar 64: pad_verse_f
+
+bar 57: bass_verse_bb
+bar 58: bass_verse_am
+
+[automation]
+automate track 3.filter_cutoff from 800 to 2200 over bar 1-8 curve=exponential
+automate track 1.filter_cutoff from 500 to 9000 over bar 5-8 curve=linear
+automate track 4.filter_cutoff from 1200 to 3000 over bar 17-24 curve=exponential
+automate track 3.filter_cutoff from 2200 to 900 over bar 41-44 curve=exponential
+automate track 3.filter_cutoff from 900 to 2400 over bar 45-48 curve=exponential
+automate track 4.filter_cutoff from 2400 to 1000 over bar 53-56 curve=exponential
+automate master.gain from 0dB to -24dB over bar 61-64 curve=exponential
