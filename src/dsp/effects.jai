@@ -131,6 +131,7 @@ process_filter_insert :: (filter_insert: *Filter_Insert, input_left: float, inpu
 initialize_master_limiter :: (master_limiter: *Master_Limiter, sample_rate: s64 = DEFAULT_SAMPLE_RATE) {
     master_limiter.sample_rate = sample_rate;
     master_limiter.envelope_follower = 0.0;
+    master_limiter.hold_counter = 0;
     configure_master_limiter(master_limiter, -0.1, 50.0);
 }
 
@@ -144,10 +145,12 @@ configure_master_limiter :: (master_limiter: *Master_Limiter, ceiling_decibels: 
     }
 
     master_limiter.release_multiplier = cast(float) pow(0.001, 1.0 / cast(float64) release_samples);
+    master_limiter.hold_samples = cast(s64) ((3.0 / 1000.0) * cast(float) master_limiter.sample_rate);
 }
 
 reset_master_limiter :: (master_limiter: *Master_Limiter) {
     master_limiter.envelope_follower = 0.0;
+    master_limiter.hold_counter = 0;
 }
 
 process_master_limiter :: (master_limiter: *Master_Limiter, input_left: float, input_right: float) -> float, float {
@@ -157,12 +160,17 @@ process_master_limiter :: (master_limiter: *Master_Limiter, input_left: float, i
         peak_level = right_absolute;
     }
 
-    if peak_level > master_limiter.envelope_follower {
+    if peak_level >= master_limiter.envelope_follower {
         master_limiter.envelope_follower = peak_level;
+        master_limiter.hold_counter = master_limiter.hold_samples;
     } else {
-        master_limiter.envelope_follower *= master_limiter.release_multiplier;
-        if master_limiter.envelope_follower < 0.00001 {
-            master_limiter.envelope_follower = 0.0;
+        if master_limiter.hold_counter > 0 {
+            master_limiter.hold_counter -= 1;
+        } else {
+            master_limiter.envelope_follower *= master_limiter.release_multiplier;
+            if master_limiter.envelope_follower < 0.00001 {
+                master_limiter.envelope_follower = 0.0;
+            }
         }
     }
 
@@ -1112,6 +1120,8 @@ Master_Limiter :: struct {
     ceiling_linear: float = 0.98855;
     release_multiplier: float = 0.999;
     envelope_follower: float = 0.0;
+    hold_counter: s64 = 0;
+    hold_samples: s64 = 0;
     sample_rate: s64 = DEFAULT_SAMPLE_RATE;
 }
 

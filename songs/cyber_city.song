@@ -6,14 +6,14 @@ bars = 96
 swing = 0.05
 
 [instruments]
-kick = sampler("samples/kick.wav", gain = 1.0)
-snare = sampler("samples/snare.wav", gain = 0.85)
-hihat = sampler("samples/hihat.wav", gain = 0.70)
-clap = sampler("samples/clap.wav", gain = 0.75)
-bass = synth(wave="saw", wave2="square", coarse2=-12, osc_mix=0.6, filter="lowpass", cutoff=650, res=0.25, attack=3, decay=120, sustain=0.4, release=80, gain=0.90)
-lead = synth(wave="saw", unison=6, detune=22.0, spread=0.85, filter="lowpass", cutoff=2800, res=0.25, attack=12, decay=180, sustain=0.7, release=220, gain=0.65)
-arp = synth(wave="saw", filter="lowpass", cutoff=1400, res=0.35, attack=5, decay=90, sustain=0.3, release=100, gain=0.75)
-pad = synth(wave="saw", wave2="saw", tune2=8.0, osc_mix=0.5, filter="lowpass", cutoff=1100, res=0.15, attack=180, decay=350, sustain=0.8, release=450, gain=0.70)
+kick = sampler("samples/kick.wav", gain = 0.85)
+snare = sampler("samples/snare.wav", gain = 0.75)
+hihat = sampler("samples/hihat.wav", gain = 0.55)
+clap = sampler("samples/clap.wav", gain = 0.65)
+bass = synth(wave="saw", wave2="square", coarse2=-12, osc_mix=0.6, filter="lowpass", cutoff=650, res=0.25, attack=3, decay=120, sustain=0.4, release=80, gain=0.82)
+lead = synth(wave="saw", unison=6, detune=22.0, spread=0.85, filter="lowpass", cutoff=2800, res=0.25, attack=12, decay=180, sustain=0.7, release=220, gain=0.60)
+arp = synth(wave="saw", filter="lowpass", cutoff=1400, res=0.35, attack=5, decay=90, sustain=0.3, release=100, gain=0.65)
+pad = synth(wave="saw", wave2="saw", tune2=8.0, osc_mix=0.5, filter="lowpass", cutoff=1100, res=0.15, attack=180, decay=350, sustain=0.8, release=450, gain=0.60)
 
 [pattern drum_intro]
 kick  | x . . . . . . . x . . . . . . . |
@@ -232,13 +232,13 @@ Bb4 step=8 len=4 vel=0.85
 Ab4 step=12 len=4 vel=0.80
 
 [mixer]
-track 1 (drums): gain = 0.95, pan = 0.0, output = master, send1 = 0.35
-track 2 (bass): gain = 0.90, pan = 0.0, filter = "lowpass", cutoff = 800, res = 0.2, sidechain = track 1, ducking_depth = 12, comp_attack = 2, comp_release = 120, output = master
-track 3 (lead): gain = 0.75, pan = 0.0, filter = "lowpass", cutoff = 8000, res = 0.25, delay = 0.25, feedback = 0.35, send1 = 0.35, output = master
-track 4 (arp): gain = 0.75, pan = -0.15, filter = "lowpass", cutoff = 3000, res = 0.3, delay = 0.375, feedback = 0.3, chorus = 0.35, chorus_rate = 1.0, send1 = 0.25, output = master
-track 5 (pad): gain = 0.70, pan = 0.15, filter = "lowpass", cutoff = 2500, res = 0.15, chorus = 0.4, chorus_rate = 0.8, send1 = 0.50, output = master
-aux 1 (reverb): gain = 0.85, reverb = 0.85, reverb_room = 0.8, reverb_damp = 0.3, reverb_predelay = 20.0
-master: gain = 1.0, limiter = on
+track 1 (drums): gain = 0.85, pan = 0.0, output = master, send1 = 0.25
+track 2 (bass): gain = 0.80, pan = 0.0, filter = "lowpass", cutoff = 800, res = 0.2, sidechain = track 1, ducking_depth = 12, comp_attack = 2, comp_release = 120, output = master
+track 3 (lead): gain = 0.70, pan = 0.0, filter = "lowpass", cutoff = 8000, res = 0.25, delay = 0.25, feedback = 0.35, send1 = 0.25, output = master
+track 4 (arp): gain = 0.65, pan = -0.15, filter = "lowpass", cutoff = 3000, res = 0.3, delay = 0.375, feedback = 0.3, chorus = 0.35, chorus_rate = 1.0, send1 = 0.20, output = master
+track 5 (pad): gain = 0.60, pan = 0.15, filter = "lowpass", cutoff = 2500, res = 0.15, chorus = 0.4, chorus_rate = 0.8, send1 = 0.35, output = master
+aux 1 (reverb): gain = 0.70, reverb = 0.85, reverb_room = 0.8, reverb_damp = 0.3, reverb_predelay = 20.0
+master: gain = 0.95, limiter = on
 
 [channel_routing]
 kick -> track 1

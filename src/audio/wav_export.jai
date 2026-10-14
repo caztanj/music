@@ -175,8 +175,12 @@ generate_kick_sample :: (sample_rate: int = DEFAULT_SAMPLE_RATE) -> [] float {
         sample_value := (cast(float) sin(phase) * amplitude_envelope + click);
         saturated_value := soft_saturate(sample_value * 1.5) * 0.95;
 
-        samples[frame_index * 2] = saturated_value;
-        samples[frame_index * 2 + 1] = saturated_value;
+        attack_fade := clamp(cast(float) (time_in_seconds / 0.001), 0.0, 1.0);
+        release_fade := clamp(cast(float) ((cast(float64) duration_in_seconds - time_in_seconds) / 0.005), 0.0, 1.0);
+        windowed_value := saturated_value * attack_fade * release_fade;
+
+        samples[frame_index * 2] = windowed_value;
+        samples[frame_index * 2 + 1] = windowed_value;
 
         frame_index += 1;
     }
@@ -217,8 +221,12 @@ generate_snare_sample :: (sample_rate: int = DEFAULT_SAMPLE_RATE) -> [] float {
 
         sample_value := soft_saturate(tone * 0.45 + noise * 0.55);
 
-        samples[frame_index * 2] = sample_value;
-        samples[frame_index * 2 + 1] = sample_value;
+        attack_fade := clamp(cast(float) (time_in_seconds / 0.001), 0.0, 1.0);
+        release_fade := clamp(cast(float) ((cast(float64) duration_in_seconds - time_in_seconds) / 0.005), 0.0, 1.0);
+        windowed_value := sample_value * attack_fade * release_fade;
+
+        samples[frame_index * 2] = windowed_value;
+        samples[frame_index * 2 + 1] = windowed_value;
 
         frame_index += 1;
     }
@@ -247,8 +255,12 @@ generate_hihat_sample :: (sample_rate: int = DEFAULT_SAMPLE_RATE) -> [] float {
         decay_envelope := cast(float) exp(-time_in_seconds * 65.0);
         sample_value := soft_saturate(highpass_sample * decay_envelope * 0.8);
 
-        samples[frame_index * 2] = sample_value;
-        samples[frame_index * 2 + 1] = sample_value;
+        attack_fade := clamp(cast(float) (time_in_seconds / 0.0005), 0.0, 1.0);
+        release_fade := clamp(cast(float) ((cast(float64) duration_in_seconds - time_in_seconds) / 0.005), 0.0, 1.0);
+        windowed_value := sample_value * attack_fade * release_fade;
+
+        samples[frame_index * 2] = windowed_value;
+        samples[frame_index * 2 + 1] = windowed_value;
 
         frame_index += 1;
     }
@@ -281,8 +293,12 @@ generate_clap_sample :: (sample_rate: int = DEFAULT_SAMPLE_RATE) -> [] float {
         amplitude_envelope := max(burst_one, burst_two) + burst_three + tail;
         sample_value := soft_saturate(filtered_noise * amplitude_envelope * 0.7);
 
-        samples[frame_index * 2] = sample_value;
-        samples[frame_index * 2 + 1] = sample_value;
+        attack_fade := clamp(cast(float) (time_in_seconds / 0.0005), 0.0, 1.0);
+        release_fade := clamp(cast(float) ((cast(float64) duration_in_seconds - time_in_seconds) / 0.005), 0.0, 1.0);
+        windowed_value := sample_value * attack_fade * release_fade;
+
+        samples[frame_index * 2] = windowed_value;
+        samples[frame_index * 2 + 1] = windowed_value;
 
         frame_index += 1;
     }

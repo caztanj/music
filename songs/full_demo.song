@@ -5,12 +5,12 @@ time_signature = 4/4
 bars = 16
 
 [instruments]
-kick = sampler("samples/kick.wav", gain = 1.0)
-snare = sampler("samples/snare.wav", gain = 0.85)
-hihat = sampler("samples/hihat.wav", gain = 0.70)
-clap = sampler("samples/clap.wav", gain = 0.75)
-bass = synth(wave="saw", filter="lowpass", cutoff=650, res=0.2, attack=5, decay=60, sustain=0.5, release=80, gain=0.9)
-lead = synth(wave="square", filter="lowpass", cutoff=1800, res=0.35, attack=10, decay=100, sustain=0.5, release=180, gain=0.8)
+kick = sampler("samples/kick.wav", gain = 0.85)
+snare = sampler("samples/snare.wav", gain = 0.75)
+hihat = sampler("samples/hihat.wav", gain = 0.55)
+clap = sampler("samples/clap.wav", gain = 0.65)
+bass = synth(wave="saw", filter="lowpass", cutoff=650, res=0.2, attack=5, decay=60, sustain=0.5, release=80, gain=0.80)
+lead = synth(wave="square", filter="lowpass", cutoff=1800, res=0.35, attack=10, decay=100, sustain=0.5, release=180, gain=0.70)
 
 [pattern drum_beat]
 kick  | x . . . x . . . x . . . x . . . |
@@ -32,10 +32,10 @@ Bb4 step=8 len=4 vel=0.9
 C5 step=12 len=4 vel=1.0
 
 [mixer]
-track 1 (drums): gain = 0.95, pan = 0.0, output = master
-track 2 (bass): gain = 0.90, pan = 0.0, output = master
-track 3 (lead): gain = 0.80, pan = 0.15, delay = 0.24, feedback = 0.35, output = master
-master: gain = 1.0, limiter = on
+track 1 (drums): gain = 0.85, pan = 0.0, output = master
+track 2 (bass): gain = 0.80, pan = 0.0, output = master
+track 3 (lead): gain = 0.70, pan = 0.15, delay = 0.24, feedback = 0.35, output = master
+master: gain = 0.95, limiter = on
 
 [channel_routing]
 kick -> track 1

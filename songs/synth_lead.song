@@ -19,7 +19,7 @@ F4 step=14 len=2 vel=0.75
 
 [mixer]
 track 1 (lead): gain = 0.85, pan = 0.1, delay = 0.23, feedback = 0.35, output = master
-master: gain = 1.0, limiter = on
+master: gain = 0.95, limiter = on
 
 [channel_routing]
 lead -> track 1

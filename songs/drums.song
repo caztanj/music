@@ -5,10 +5,10 @@ time_signature = 4/4
 bars = 4
 
 [instruments]
-kick = sampler("samples/kick.wav", gain = 1.0)
-snare = sampler("samples/snare.wav", gain = 0.85)
-hihat = sampler("samples/hihat.wav", gain = 0.70)
-clap = sampler("samples/clap.wav", gain = 0.75)
+kick = sampler("samples/kick.wav", gain = 0.85)
+snare = sampler("samples/snare.wav", gain = 0.75)
+hihat = sampler("samples/hihat.wav", gain = 0.55)
+clap = sampler("samples/clap.wav", gain = 0.65)
 
 [pattern beat_groove]
 kick  | x . . . x . . . x . . . x . . . |
@@ -17,8 +17,8 @@ hihat | x . x . x . x . x . x . x . x . |
 clap  | . . . . . . . . . . . . x . . . |
 
 [mixer]
-track 1 (drums): gain = 0.95, pan = 0.0, output = master
-master: gain = 1.0, limiter = on
+track 1 (drums): gain = 0.85, pan = 0.0, output = master
+master: gain = 0.95, limiter = on
 
 [channel_routing]
 kick -> track 1
